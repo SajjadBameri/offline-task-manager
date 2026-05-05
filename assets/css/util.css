@@ -213,8 +213,8 @@
   width: 90%;
 }
 
-.width_95 {
-  width: 95%;
+.width_100 {
+   width: 200px;;
 }
 .width_100 {
   width: 1024px;
@@ -229,12 +229,7 @@
 .left {
   left: 30px;
 }
-.top-7 {
-  top: 7px;
-}
-.top-5 {
-  top: 5px;
-}
+
 /* .color
 ------------------------------- */
 

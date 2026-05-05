@@ -7,12 +7,9 @@
     104
   ); /* Applied to main navmenu links when they are hovered over or active */
   --nav-hover-btn: rgb(0, 140, 255);
-  --nav-mobile-background-color: #eaeaea; /* Used as the background color for mobile navigation menu */
-  --nav-dropdown-background-color: #ffffff; /* Used as the background color for dropdown items that appear when hovering over primary navigation items */
-  --nav-dropdown-color: #393939; /* Used for navigation links of the dropdown items in the navigation menu. */
-  --nav-dropdown-hover-color: #000000; /* Similar to --nav-hover-color, this color is applied to dropdown navigation links when they are hovered over. */
+  
 }
-.dark-background {
+.dark-background{
   background-color: var(--bg-body);
   color: var(--nav-color);
 }
@@ -88,16 +85,6 @@
 }
 
 
-
-.w-100 {
-  width: 200px;
-}
-.w-full {
-  border-radius: 7px;
-  width: 300px;
-  height: 40px;
-  margin: 10px;
-}
 .bord-blue {
   filter: drop-shadow(0px 0px 5px #0095ff53);
 }
@@ -144,18 +131,10 @@
   overflow: hidden;
 }
 
-.sort-list {
-  display: grid;
-  align-content: space-between;
-  justify-items: center;
-}
+
 
 .dis-none {
   display: none;
-}
-.user-list-section {
-  height: calc(100vh-250px);
-  overflow: auto;
 }
 
 
