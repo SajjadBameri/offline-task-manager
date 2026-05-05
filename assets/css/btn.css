@@ -1,7 +1,7 @@
 /* From Uiverse.io by alexruix */ 
 .group {
   display: flex;
-  line-height: 28px;
+  line-height:10px;
   align-items: center;
   position: relative;
   max-width: 190px;
@@ -16,9 +16,9 @@
   border: 2px solid transparent;
   border-radius: 8px;
   outline: none;
-  background-color: #D9E8D8;
+  background-color: #d2edff00;
   color: #0d0c22;
-  box-shadow: 0 0 5px #C1D9BF, 0 0 0 10px #f5f5f5eb;
+  box-shadow: 0 0 5px #bfcbd9, 0 0 0 3px #f5f5f5eb;
   transition: .3s ease;
 }
 
@@ -33,7 +33,12 @@
   width: 1rem;
   height: 1rem;
 }
-
+.bg-blue-75{
+  background-color: rgba(0, 132, 255, 0.575);
+  border: 2px solid rgba(0, 132, 255, 0.692);
+  border-radius: 10px;
+  padding: 10px;
+}
 
 
 
