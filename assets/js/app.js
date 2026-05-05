@@ -1,4 +1,4 @@
-const whatttt = document.getElementById("whatttt");
+const Rudex = document.getElementById("Rudex");
 const spinner = document.getElementById("spinner");
 const load = document.getElementById("lode");
 const start = document.getElementById("start");
@@ -92,7 +92,7 @@ if (send) {
         if (load) load.classList.add("dis-hide");
       }, 4000);
       setTimeout(() => {
-        if (whatttt) whatttt.classList.remove("dis-hide");
+        if (Rudex) Rudex.classList.remove("dis-hide");
         checkEmptyTasks();
       }, 4000);
     } else {
@@ -640,11 +640,11 @@ if (create2) {
       if (addUserBack) addUserBack.classList.add("dis-hide");
       const keytype = document.getElementById("type");
       if (keytype) keytype.classList.remove("dis-hide");
-      if (whatttt) whatttt.classList.add("dis-hide");
+      if (Rudex) Rudex.classList.add("dis-hide");
 
       setTimeout(() => {
         if (keytype) keytype.classList.add("dis-hide");
-        if (whatttt) whatttt.classList.remove("dis-hide");
+        if (Rudex) Rudex.classList.remove("dis-hide");
       }, 4000);
     });
   });
