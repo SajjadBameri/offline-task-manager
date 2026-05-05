@@ -308,10 +308,8 @@
   border-radius: 25px;
 }
 
-.rounded-top {
-  border-radius: 20px;
-}
-.pos-relative {
+
+.pos-relative{
   position: relative;
   top: 5px;
 }
@@ -364,9 +362,7 @@ body {
   }
 }
 
-.pictur-mode {
-  mix-blend-mode: multiply;
-}
+
 .tras-10 {
   animation: aa ease 2.3s infinite;
 }
@@ -394,7 +390,7 @@ body {
   padding: 25px;
 }
 
-.icon {
+.icon{
   position: absolute;
   left: 1rem;
   fill: #9e9ea7;
@@ -430,7 +426,7 @@ mix-blend-mode:;
     display: none;
   }
 }
-.show-sm-up-down {
+.show-sm-up-down{
   border: 1px solid rgba(255, 0, 0, 0);
 }
 @media (min-width: 450px) {

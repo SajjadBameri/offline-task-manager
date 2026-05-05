@@ -49,13 +49,7 @@
   }
 }
 
-.cricle {
-  width: 30px;
-  height: 30px;
-  background-color: #0096ff;
-  border-radius: 100px;
-  animation: cc 800ms infinite;
-}
+
 
 @keyframes cc {
   0% {
