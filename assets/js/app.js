@@ -117,7 +117,7 @@ function formatPersianDateTime(date) {
 
   try {
     return new Intl.DateTimeFormat("fa-IR", options).format(date);
-  } catch (e) {
+  } catch(e) {
     return date
       .toLocaleString("fa-IR", {
         year: "numeric",
@@ -418,11 +418,11 @@ function displayData() {
       const doneWrapper = document.createElement("div");
       doneWrapper.className = "d-flex align-items-center gap-2 cursor-pointer";
 
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.className = "d-none";
-      checkbox.id = "done" + taskId;
-      checkbox.checked = completed;
+  const checkbox = document.createElement("input");
+     checkbox.type = "checkbox";
+    checkbox.className = "form-check-input m-0";
+    checkbox.id = "done" + taskId;
+    checkbox.checked = completed;
 
       const doneIcon = document.createElement("label");
       doneIcon.setAttribute("for", checkbox.id);
@@ -714,7 +714,7 @@ function updateCount(hasResults = true, completedCount = 0, totalCount = 0) {
       }
     }
 
-    if (currentSearchTerm === "" && !showOnlyCompleted) {
+    if (currentSearchTerm === "" && !showOnlyCompleted){
       checkEmptyTasks();
     }
   }, 100);
