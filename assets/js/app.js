@@ -44,13 +44,19 @@ let swRegistration = null;
 let notifTimers = new Map();
 let currentInvoiceTaskId = null;
 let currentInvoiceBlob = null;
+let notifEnabled = false;
 
-const STORE_NAME = "صورت حساب خرید";
-const STORE_TAGLINE = "";
+const STORE_NAME = "نقل و نبات ممتاز سیستان";
+const STORE_TAGLINE = "کیفیت برتر، طعم اصیل";
 
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
+const NOTIF_PREF_KEY = "yaddashyar_notif_enabled";
+
+/* ============================================================
+   توابع کمکی عدد و قیمت
+   ============================================================ */
 function toEnglishDigits(str) {
   if (str === null || str === undefined) return "";
   return String(str).replace(/[۰-۹٠-٩]/g, (d) => {
@@ -106,6 +112,9 @@ function formatPriceInputLive(input) {
   try { input.setSelectionRange(newCaret, newCaret); } catch (e) {}
 }
 
+/* ============================================================
+   لودر
+   ============================================================ */
 function hideLoader() {
   if (loaderHidden || !load) return;
   loaderHidden = true;
@@ -129,20 +138,152 @@ if (document.readyState === "complete" || document.readyState === "interactive")
 setTimeout(hideLoader, 2500);
 window.addEventListener("error", hideLoader);
 
+/* ============================================================
+   ذخیره و بازیابی وضعیت نوتیفیکیشن
+   ============================================================ */
+function saveNotifPref(enabled) {
+  try { localStorage.setItem(NOTIF_PREF_KEY, enabled ? "1" : "0"); } catch (e) {}
+}
+
+function loadNotifPref() {
+  try { return localStorage.getItem(NOTIF_PREF_KEY) === "1"; } catch (e) { return false; }
+}
+
+/* ============================================================
+   به‌روزرسانی ظاهر دکمه اعلان
+   ============================================================ */
+function updateNotifButtonUI() {
+  if (!enableNotifBtn) return;
+  const icon = enableNotifBtn.querySelector("i");
+  const label = enableNotifBtn.querySelector("span");
+
+  if (notifEnabled) {
+    enableNotifBtn.classList.add("active");
+    if (icon) icon.className = "bi bi-bell-fill";
+    if (label) label.textContent = "روشن";
+  } else {
+    enableNotifBtn.classList.remove("active");
+    if (icon) icon.className = "bi bi-bell-slash";
+    if (label) label.textContent = "اعلان";
+  }
+}
+
+/* ============================================================
+   روشن کردن نوتیفیکیشن
+   ============================================================ */
+async function enableNotifications() {
+  if (!("Notification" in window)) {
+    showToast("مرورگر شما از نوتیفیکیشن پشتیبانی نمی‌کند", "warning");
+    return false;
+  }
+
+  try {
+    let perm = Notification.permission;
+    if (perm === "default") {
+      perm = await Notification.requestPermission();
+    }
+
+    if (perm !== "granted") {
+      showToast("اجازه نوتیفیکیشن داده نشد. از تنظیمات مرورگر اجازه بده.", "danger");
+      notifEnabled = false;
+      saveNotifPref(false);
+      updateNotifButtonUI();
+      return false;
+    }
+
+    notifEnabled = true;
+    saveNotifPref(true);
+    updateNotifButtonUI();
+
+    showToast("نوتیفیکیشن فعال شد ✅", "success");
+
+    // ثبت Periodic Sync
+    if (swRegistration && "periodicSync" in swRegistration) {
+      try {
+        await swRegistration.periodicSync.register("deadline-check", {
+          minInterval: 24 * 60 * 60 * 1000,
+        });
+      } catch (err) {}
+    }
+
+    // نوتیف تستی
+    setTimeout(() => {
+      if (swRegistration && notifEnabled) {
+        swRegistration.showNotification("🎉 نوتیفیکیشن فعال شد", {
+          body: "از این به بعد یادآوری‌ها روی گوشی شما نمایش داده میشه",
+          icon: "./assets/img/maskable-512.png",
+          badge: "./assets/img/maskable-512.png",
+          vibrate: [200, 100, 200],
+          tag: "test-enabled",
+          requireInteraction: false,
+        });
+      }
+    }, 800);
+
+    // دوباره تایمرها رو زمان‌بندی کن
+    scheduleAllDeadlineTimers();
+    return true;
+
+  } catch (err) {
+    showToast("خطا در فعال‌سازی نوتیفیکیشن", "danger");
+    return false;
+  }
+}
+
+/* ============================================================
+   خاموش کردن نوتیفیکیشن
+   ============================================================ */
+function disableNotifications() {
+  notifEnabled = false;
+  saveNotifPref(false);
+  updateNotifButtonUI();
+
+  // لغو همه تایمرها
+  notifTimers.forEach((timer, key) => {
+    if (String(key).startsWith("repeat-")) clearInterval(timer);
+    else clearTimeout(timer);
+  });
+  notifTimers.clear();
+  notifiedTasks.clear();
+
+  // لغو Periodic Sync
+  if (swRegistration && "periodicSync" in swRegistration) {
+    try {
+      swRegistration.periodicSync.unregister("deadline-check").catch(() => {});
+    } catch (err) {}
+  }
+
+  showToast("نوتیفیکیشن خاموش شد 🔕", "info");
+}
+
+/* ============================================================
+   Toggle
+   ============================================================ */
+async function toggleNotifications() {
+  if (notifEnabled) {
+    disableNotifications();
+  } else {
+    await enableNotifications();
+  }
+}
+
+/* ============================================================
+   Service Worker
+   ============================================================ */
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   try {
     swRegistration = await navigator.serviceWorker.register("./service-worker.js");
-    if ("periodicSync" in swRegistration) {
+
+    // اگر قبلاً کاربر نوتیف رو روشن کرده بود، Periodic Sync رو دوباره ثبت کن
+    if (notifEnabled && "periodicSync" in swRegistration) {
       try {
-        const status = await navigator.permissions.query({ name: "periodic-background-sync" });
-        if (status.state === "granted") {
-          await swRegistration.periodicSync.register("deadline-check", {
-            minInterval: 24 * 60 * 60 * 1000,
-          });
-        }
+        await swRegistration.periodicSync.register("deadline-check", {
+          minInterval: 24 * 60 * 60 * 1000,
+        });
       } catch (err) {}
     }
+
     navigator.serviceWorker.addEventListener("message", handleSWMessage);
   } catch (err) {}
 }
@@ -156,6 +297,9 @@ function handleSWMessage(event) {
   }
 }
 
+/* ============================================================
+   تقویم شمسی
+   ============================================================ */
 function tryInitDatepicker() {
   if (datepickerReady) return true;
   if (typeof jQuery === "undefined") return false;
@@ -193,6 +337,9 @@ const dpInterval = setInterval(() => {
   if (tryInitDatepicker() || dpAttempts > 15) clearInterval(dpInterval);
 }, 300);
 
+/* ============================================================
+   تم تاریک
+   ============================================================ */
 try {
   switchCheckDarken?.addEventListener("click", () => {
     document.body.classList.toggle("dark-background");
@@ -208,6 +355,9 @@ try {
   });
 } catch (e) {}
 
+/* ============================================================
+   توابع تاریخ
+   ============================================================ */
 function formatPersianDate(date) {
   try {
     return new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
@@ -263,6 +413,9 @@ function getDeadlineStatus(deadline) {
   return "normal";
 }
 
+/* ============================================================
+   IndexedDB
+   ============================================================ */
 function openDatabase() {
   try {
     const request = window.indexedDB.open("To do", 6);
@@ -299,6 +452,9 @@ function openDatabase() {
   } catch (e) { hideLoader(); }
 }
 
+/* ============================================================
+   CRUD
+   ============================================================ */
 function addData(callback) {
   if (!db) { showToast("دیتابیس آماده نیست", "danger"); return; }
   try {
@@ -316,7 +472,7 @@ function addData(callback) {
     const req = tx.objectStore("To do").add(newItem);
     req.onsuccess = () => {
       const newId = req.result;
-      if (newItem.deadline && !newItem.completed) {
+      if (newItem.deadline && !newItem.completed && notifEnabled) {
         scheduleDeadlineTimer(newId, new Date(newItem.deadline), newItem.Title);
       }
     };
@@ -338,7 +494,7 @@ function updateTask(id, updates, callback) {
       store.put(data);
       tx.oncomplete = () => {
         if (data.completed) cancelNotifTimer(id);
-        else if (data.deadline) scheduleDeadlineTimer(id, new Date(data.deadline), data.Title);
+        else if (data.deadline && notifEnabled) scheduleDeadlineTimer(id, new Date(data.deadline), data.Title);
         callback?.();
         displayData();
       };
@@ -386,6 +542,9 @@ function getTaskById(id) {
   });
 }
 
+/* ============================================================
+   فیلتر
+   ============================================================ */
 function searchTasks(term) {
   currentSearchTerm = term.toLowerCase().trim();
   displayData();
@@ -427,6 +586,9 @@ function updateActiveCard() {
   });
 }
 
+/* ============================================================
+   رندر
+   ============================================================ */
 function displayData() {
   if (!db || !from) return;
   try {
@@ -489,6 +651,9 @@ function displayData() {
   } catch (e) {}
 }
 
+/* ============================================================
+   ساخت کارت یادداشت
+   ============================================================ */
 function buildTaskElement({ taskId, title, description, price, completed, createdAt, deadline }) {
   const task = document.createElement("div");
   task.className = "task";
@@ -620,6 +785,9 @@ function buildTaskElement({ taskId, title, description, price, completed, create
   return task;
 }
 
+/* ============================================================
+   فرم
+   ============================================================ */
 function openCreateForm() {
   resetForm();
   formTitle.textContent = "یادداشت جدید";
@@ -682,6 +850,9 @@ function closeForm() {
   resetForm();
 }
 
+/* ============================================================
+   حذف
+   ============================================================ */
 function openDeleteConfirm(taskId) {
   pendingDeleteId = taskId;
   ask.classList.remove("dis-hide");
@@ -702,6 +873,9 @@ function confirmDelete() {
   closeDeleteConfirm();
 }
 
+/* ============================================================
+   پیام‌های خالی
+   ============================================================ */
 function showNoResultsMessage() {
   from.innerHTML = `<div class="empty-state"><h5>نتیجه‌ای یافت نشد</h5><p>هیچ یادداشتی با عبارت «${currentSearchTerm}» پیدا نشد</p></div>`;
 }
@@ -729,6 +903,9 @@ function checkEmptyTasks() {
   }, 100);
 }
 
+/* ============================================================
+   شمارنده و آمار
+   ============================================================ */
 function updateCount(visibleCount, totalCount) {
   setTimeout(() => {
     const countEl = document.getElementById("count");
@@ -749,6 +926,9 @@ function updateStats(total, done, urgent) {
   if (elUrgent) elUrgent.textContent = urgent;
 }
 
+/* ============================================================
+   فاکتور و اشتراک‌گذاری
+   ============================================================ */
 async function openInvoicePreview(taskId) {
   const task = await getTaskById(taskId);
   if (!task) { showToast("تسک پیدا نشد", "danger"); return; }
@@ -840,7 +1020,7 @@ function buildInvoiceHTML(task) {
       <div dir="rtl" style="padding:16px 22px 20px;background:#f8fafc;text-align:center;border-top:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
         <p dir="rtl" lang="fa" style="font-size:14px;font-weight:800;color:#1e40af;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;">🙏 از خرید شما سپاسگزاریم</p>
         <p dir="rtl" lang="fa" style="font-size:11px;color:#64748b;margin:0;line-height:1.8;font-family:${ff};letter-spacing:0;">جهت سفارشات بیشتر و پیگیری با ما در تماس باشید</p>
-      
+        <p dir="rtl" lang="fa" style="font-size:9px;color:#94a3b8;margin:10px 0 0 0;font-family:${ff};letter-spacing:0;">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
       </div>
 
     </div>
@@ -923,7 +1103,11 @@ function downloadInvoiceImage(fileName) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/* ============================================================
+   نوتیفیکیشن
+   ============================================================ */
 function scheduleDeadlineTimer(taskId, deadline, title) {
+  if (!notifEnabled) return;
   cancelNotifTimer(taskId);
   const now = Date.now();
   const deadlineMs = deadline.getTime();
@@ -934,6 +1118,7 @@ function scheduleDeadlineTimer(taskId, deadline, title) {
     return;
   }
   const timer = setTimeout(() => {
+    if (!notifEnabled) return;
     sendDeadlineNotification(taskId, title, false);
     startRepeatTimer(taskId, title);
   }, diff);
@@ -941,9 +1126,11 @@ function scheduleDeadlineTimer(taskId, deadline, title) {
 }
 
 function startRepeatTimer(taskId, title) {
+  if (!notifEnabled) return;
   const existingKey = "repeat-" + taskId;
   if (notifTimers.has(existingKey)) clearInterval(notifTimers.get(existingKey));
   const repeatTimer = setInterval(async () => {
+    if (!notifEnabled) { cancelNotifTimer(taskId); return; }
     const task = await getTaskById(taskId);
     if (!task || task.completed) { cancelNotifTimer(taskId); return; }
     sendDeadlineNotification(taskId, title, true);
@@ -964,6 +1151,7 @@ function cancelNotifTimer(taskId) {
 }
 
 async function sendDeadlineNotification(taskId, title, isOverdue) {
+  if (!notifEnabled) return;
   const notifTitle = isOverdue ? "🔴 موعد تسک رسید!" : "⏰ یادآوری تسک";
   const notifBody = `"${title}" هنوز انجام نشده`;
   if (swRegistration && "showNotification" in swRegistration) {
@@ -990,6 +1178,7 @@ async function sendDeadlineNotification(taskId, title, isOverdue) {
 }
 
 function sendBasicNotification(title, body, taskId) {
+  if (!notifEnabled) return;
   if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
   try {
@@ -1021,6 +1210,7 @@ function updateTaskLastNotif(taskId, isoString) {
 }
 
 async function checkMissedNotifications() {
+  if (!notifEnabled) return;
   const tasks = await getAllTasks();
   const now = Date.now();
   for (const task of tasks) {
@@ -1030,12 +1220,15 @@ async function checkMissedNotifications() {
     const lastNotif = task.lastNotificationAt ? new Date(task.lastNotificationAt).getTime() : 0;
     const hoursSinceLast = (now - lastNotif) / 3600000;
     if (lastNotif === 0 || hoursSinceLast >= 24) {
-      setTimeout(() => { sendDeadlineNotification(task.id, task.Title, true); }, 1500);
+      setTimeout(() => {
+        if (notifEnabled) sendDeadlineNotification(task.id, task.Title, true);
+      }, 1500);
     }
   }
 }
 
 async function scheduleAllDeadlineTimers() {
+  if (!notifEnabled) return;
   const tasks = await getAllTasks();
   for (const task of tasks) {
     if (task.completed || !task.deadline) continue;
@@ -1043,6 +1236,9 @@ async function scheduleAllDeadlineTimers() {
   }
 }
 
+/* ============================================================
+   رویدادها
+   ============================================================ */
 function bindEvents() {
   fabAdd?.addEventListener("click", openCreateForm);
   cancelForm?.addEventListener("click", closeForm);
@@ -1136,42 +1332,8 @@ function bindEvents() {
     if (e.target === invoicePreview) closeInvoicePreview();
   });
 
-  enableNotifBtn?.addEventListener("click", async () => {
-    if (!("Notification" in window)) {
-      showToast("مرورگر شما از نوتیفیکیشن پشتیبانی نمی‌کند", "warning");
-      return;
-    }
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm === "granted") {
-        showToast("نوتیفیکیشن فعال شد ✅", "success");
-        enableNotifBtn.classList.add("active");
-        const icon = enableNotifBtn.querySelector("i");
-        if (icon) icon.className = "bi bi-bell-fill";
-        setTimeout(() => {
-          if (swRegistration) {
-            swRegistration.showNotification("🎉 نوتیفیکیشن فعال شد", {
-              body: "از این به بعد یادآوری‌ها روی گوشی شما نمایش داده میشه",
-              icon: "./assets/img/maskable-512.png",
-              vibrate: [200, 100, 200],
-              tag: "test",
-            });
-          }
-        }, 1000);
-        if (swRegistration && "periodicSync" in swRegistration) {
-          try {
-            await swRegistration.periodicSync.register("deadline-check", {
-              minInterval: 24 * 60 * 60 * 1000,
-            });
-          } catch (err) {}
-        }
-      } else {
-        showToast("اجازه نوتیفیکیشن داده نشد", "danger");
-      }
-    } catch (err) {
-      showToast("خطا در فعال‌سازی نوتیفیکیشن", "danger");
-    }
-  });
+  // 🆕 Toggle نوتیفیکیشن
+  enableNotifBtn?.addEventListener("click", toggleNotifications);
 
   exportPdfBtn?.addEventListener("click", generateInvoicePDF);
 
@@ -1182,6 +1344,9 @@ function bindEvents() {
   });
 }
 
+/* ============================================================
+   Toast
+   ============================================================ */
 function showToast(message, type = "info") {
   if (!toastContainer) return;
   const toast = document.createElement("div");
@@ -1201,6 +1366,9 @@ function showToast(message, type = "info") {
   }, 3500);
 }
 
+/* ============================================================
+   PDF
+   ============================================================ */
 let _vazirFontCache = null;
 
 async function getVazirFont() {
@@ -1357,6 +1525,9 @@ async function generateInvoicePDF() {
   }
 }
 
+/* ============================================================
+   PWA Install
+   ============================================================ */
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
@@ -1367,6 +1538,9 @@ window.addEventListener("appinstalled", () => {
   deferredPrompt = null;
 });
 
+/* ============================================================
+   Scroll
+   ============================================================ */
 function initHeaderScroll() {
   const appHeader = document.getElementById("appHeader");
   if (!appHeader) return;
@@ -1383,8 +1557,21 @@ function initHeaderScroll() {
   }, { passive: true });
 }
 
+/* ============================================================
+   Init
+   ============================================================ */
 function init() {
   try { bindEvents(); } catch (e) {}
+
+  // 🆕 بازیابی وضعیت نوتیفیکیشن از localStorage
+  notifEnabled = loadNotifPref();
+  // اگه کاربر قبلاً روشن کرده بود ولی مجوز پس گرفته شده، خاموشش کن
+  if (notifEnabled && "Notification" in window && Notification.permission !== "granted") {
+    notifEnabled = false;
+    saveNotifPref(false);
+  }
+  updateNotifButtonUI();
+
   try { registerSW(); } catch (e) {}
   try { openDatabase(); } catch (e) { hideLoader(); }
   try { initHeaderScroll(); } catch (e) {}
