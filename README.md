@@ -1,30 +1,107 @@
-# To-Do App (Offline-First)
+# 📝 یادداشت‌یار
 
-## 📌 Overview
-This is a simple and practical To-Do application built using Vanilla JavaScript, designed to work entirely on the client side.  
-The app stores data using IndexedDB, allowing tasks to persist even after page refresh or browser restart — without any backend or external API.
+<div align="center">
 
-This project is intended as a portfolio / learning project, focusing on real-world browser storage and offline-first behavior.
+![Yaddasht-yar](assets/img/maskable-512.png)
 
-## 🛠️ Technologies Used
-- HTML5
-- CSS3
-- Bootstrap (for responsive UI)
-- Vanilla JavaScript (no JS frameworks)
-- IndexedDB (for persistent client-side storage)
+**مدیریت یادداشت‌ها و کارهای زمان‌دار با تقویم شمسی**
 
-> No JavaScript frameworks such as React, Vue, or Alpine.js are used.
+ساخته‌شده با Vanilla JavaScript و IndexedDB
 
-## ✅ Features
-- Create, edit, and delete tasks (basic CRUD)
-- Persistent storage using IndexedDB
-- Data remains after refresh or browser restart
-- Responsive UI built with Bootstrap
-- Works offline
-- No backend or server required
+[![PWA](https://img.shields.io/badge/PWA-Ready-2563eb?style=flat-square)](https://web.dev/progressive-web-apps/)
+[![Offline](https://img.shields.io/badge/Offline-First-16a34a?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)
+[![Version](https://img.shields.io/badge/Version-1.0.0-f59e0b?style=flat-square)]()
+[![License](https://img.shields.io/badge/License-MIT-dc2626?style=flat-square)](LICENSE)
+[![Vanilla JS](https://img.shields.io/badge/Vanilla-JS-0891b2?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 
-## ⚠️ Limitations
-- Data is stored per browser and per device
-- No cross-device synchronization
-- No authentication or multi-user support
-- Not intended for production or enterprise use
+[English](#-english-version) · [فارسی](#-درباره-پروژه)
+
+</div>
+
+---
+
+## 📌 درباره پروژه
+
+**یادداشت‌یار** یک اپلیکیشن **مدیریت یادداشت‌ها و کارهای زمان‌دار** است که کاملاً **سمت کلاینت** و **Offline-First** طراحی شده است.
+
+برخلاف یک To-Do ساده، این اپلیکیشن قابلیت **یادداشت‌گذاری آزاد**، **زمان‌بندی هوشمند** و **هشدارهای خودکار ددلاین** را فراهم می‌کند — همه این‌ها بدون نیاز به بک‌اند، دیتابیس ابری یا API خارجی.
+
+تمام داده‌ها با **IndexedDB** در مرورگر ذخیره می‌شوند و **با بستن مرورگر از بین نمی‌روند**.
+
+> این پروژه به‌عنوان یک نمونه Portfolio / Learning، روی **ذخیره‌سازی واقعی مرورگر**، **PWA** و **تجربه کاربری فارسی** تمرکز دارد.
+
+---
+
+## ✨ قابلیت‌ها
+
+### 📝 یادداشت‌ها و کارها
+- ✍️ **ایجاد یادداشت** با عنوان، توضیحات و ددلاین اختیاری
+- ✏️ **ویرایش** کامل یادداشت‌ها
+- 🗑️ **حذف** با تأیید دو مرحله‌ای
+- ☑️ **علامت‌گذاری** به‌عنوان انجام‌شده / نشده
+- 🔍 **جستجوی زنده** در تمام یادداشت‌ها
+- 🎯 **فیلتر** انجام‌شده‌ها
+
+### ⏰ زمان‌بندی و هشدار
+- 📆 **تقویم شمسی** برای انتخاب ددلاین
+- ⏱️ **نمایش زمان باقی‌مانده** (X دقیقه دیگر / گذشته)
+- 🎨 **بج‌های رنگی** برای وضعیت ددلاین:
+  - 🔵 عادی (> ۳ روز)
+  - 🟡 نزدیک (< ۳ روز)
+  - 🟠 فوری (< ۲۴ ساعت)
+  - 🔴 گذشته
+- 🔔 **نوتیفیکیشن مرورگر** (Browser Notification)
+- ⏲️ **بررسی خودکار** هر ۶۰ ثانیه
+- ⚡ **هشدار هوشمند**: ۱ ساعت قبل + لحظه ددلاین
+
+### 💾 ذخیره‌سازی
+- تمام داده‌ها در **IndexedDB**
+- **ماندگار** بعد از بستن مرورگر
+- **کاملاً لوکال** — هیچ داده‌ای به سرور ارسال نمی‌شود
+- **بدون نیاز به ثبت‌نام** یا احراز هویت
+
+### 🎨 رابط کاربری
+- 🌐 **کاملاً راست‌چین (RTL)** با فونت **وزیرمتن**
+- 🌓 **دو تم**: روشن (آبی/سفید/سبز/قرمز) + تاریک (آبی/خاکستری)
+- 📱 **Responsive** روی موبایل و دسکتاپ
+- 🎬 **انیمیشن‌های نرم** و کارت‌های شیشه‌ای (Glassmorphism)
+- 🎈 **دکمه شناور (FAB)** برای ایجاد سریع
+- 📊 **نوار آماری** بالای صفحه
+
+### 📄 خروجی PDF
+- 🧾 **تولید فاکتور PDF** از تمام یادداشت‌ها
+- 🎨 طراحی زیبا با هدر رنگی
+- 📊 خلاصه آماری (کل / انجام‌شده / در انتظار)
+- 🖋️ فونت **وزیرمتن** جاسازی‌شده
+- 📅 تمام تاریخ‌ها **شمسی**
+
+### 🚀 PWA (Progressive Web App)
+- 📲 **نصب روی موبایل** مثل اپ نیتیو
+- 🔌 **کار کامل آفلاین** با Service Worker
+- 🎯 **Shortcuts** برای دسکتاپ
+- 🌈 **Splash screen** اختصاصی
+- 💾 **کش هوشمند** فایل‌های استاتیک
+
+---
+
+## 🛠️ تکنولوژی‌های استفاده‌شده
+
+| تکنولوژی | کاربرد |
+|----------|--------|
+| **HTML5** | ساختار اپلیکیشن |
+| **CSS3** | استایل، انیمیشن، Glassmorphism |
+| **Bootstrap 5** | Responsive UI |
+| **Vanilla JavaScript** | منطق برنامه (بدون فریم‌ورک) |
+| **IndexedDB** | ذخیره‌سازی کلاینت‌ساید |
+| **Service Worker** | پشتیبانی از حالت آفلاین |
+| **Web App Manifest** | نصب به‌عنوان PWA |
+| **jsPDF** | تولید فایل PDF |
+| **Persian Datepicker** | انتخاب تاریخ شمسی |
+| **Vazirmatn Font** | فونت فارسی |
+| **Bootstrap Icons** | مجموعه آیکون |
+
+> ⚠️ **هیچ فریم‌ورک جاوااسکریپتی** مثل React، Vue، Svelte یا Alpine.js استفاده نشده است.
+
+---
+
+## 📁 ساختار پروژه

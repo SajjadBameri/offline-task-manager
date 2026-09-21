@@ -1,5 +1,5 @@
 /* ============================================================
-   To-Do App - نسخه نهایی با تاریخ شمسی و رابط حرفه‌ای
+   To-Do App - نسخه نهایی PWA با PDF
    ============================================================ */
 
 /* ---------- المان‌ها ---------- */
@@ -16,13 +16,15 @@ const create2 = document.getElementById("create2");
 const cancelForm = document.getElementById("cancelForm");
 const ask = document.getElementById("ask");
 const adduserback = document.getElementById("addblur");
-const create = document.getElementById("create");
+const fabAdd = document.getElementById("fabAdd");
 const from = document.getElementById("from");
 const searchInput = document.getElementById("search");
 const switchCheckDefault = document.getElementById("switchCheckDefault");
 const switchCheckDarken = document.getElementById("switchCheckDarken");
 const nodeleted = document.getElementById("nodeleted");
+const yasdelete = document.getElementById("yasdelete");
 const enableNotifBtn = document.getElementById("enableNotif");
+const exportPdfBtn = document.getElementById("exportPdfBtn");
 const toastContainer = document.getElementById("toast-container");
 
 /* ---------- وضعیت ---------- */
@@ -32,100 +34,104 @@ let showOnlyCompleted = false;
 let editingTaskId = null;
 let selectedDeadline = null;
 let notifiedTasks = new Set();
-let deadlinePicker = null;
+let pendingDeleteId = null;
+let datepickerReady = false;
 
 /* ============================================================
-   لودر - با اطمینان کامل حذف می‌شود
+   لودر - تضمینی
    ============================================================ */
 function hideLoader() {
   if (!load) return;
-  load.classList.add("fade-out");
-  setTimeout(() => {
+  try {
+    load.classList.add("fade-out");
+    setTimeout(() => {
+      load.style.display = "none";
+      load.classList.add("dis-hide");
+    }, 400);
+  } catch (e) {
     load.style.display = "none";
-    load.classList.add("dis-hide");
-  }, 400);
+  }
 }
 
-// اگر صفحه سریع لود شد
-window.addEventListener("load", () => {
-  setTimeout(hideLoader, 1200);
-});
-
-// اطمینان: حداکثر بعد از ۳ ثانیه لودر باید برود
-setTimeout(hideLoader, 3000);
+// 3 مسیر خروج مطمئن از لودر
+window.addEventListener("load", () => setTimeout(hideLoader, 800));
+document.addEventListener("DOMContentLoaded", () => setTimeout(hideLoader, 1500));
+setTimeout(hideLoader, 3500);
 
 /* ============================================================
-   تقویم شمسی
+   تقویم شمسی - با چک کردن آمادگی
    ============================================================ */
-function initPersianDatepicker() {
-  if (typeof jQuery === "undefined") {
-    console.warn("jQuery not loaded");
-    return;
-  }
-  if (!jQuery.fn.persianDatepicker) {
-    console.warn("Persian datepicker not loaded");
-    return;
-  }
+function tryInitDatepicker() {
+  if (datepickerReady) return true;
 
-  deadlinePicker = jQuery("#taskDeadline").persianDatepicker({
-    format: "YYYY/MM/DD HH:mm",
-    initialValue: false,
-    autoClose: true,
-    persianDigit: true,
-    observer: true,
-    calendar: {
-      persian: {
-        locale: "fa",
-        showHint: true,
-        leapYearMode: "algorithmic",
+  if (typeof jQuery === "undefined") return false;
+  if (!jQuery.fn || !jQuery.fn.persianDatepicker) return false;
+
+  try {
+    jQuery("#taskDeadline").persianDatepicker({
+      format: "YYYY/MM/DD HH:mm",
+      initialValue: false,
+      autoClose: true,
+      persianDigit: true,
+      observer: true,
+      calendar: {
+        persian: { locale: "fa", showHint: true, leapYearMode: "algorithmic" },
       },
-    },
-    timePicker: {
-      enabled: true,
-      meridiem: { enabled: false },
-      second: { enabled: false },
-      minute: { enabled: true, step: 1 },
-      hour: { enabled: true },
-    },
-    toolbox: {
-      calendarSwitch: { enabled: false },
-      todayButton: { enabled: true, text: { fa: "امروز" } },
-      submitButton: { enabled: true, text: { fa: "تأیید" } },
-    },
-    onSelect: function (unix) {
-      selectedDeadline = new Date(unix);
-    },
-  });
+      timePicker: {
+        enabled: true,
+        meridiem: { enabled: false },
+        second: { enabled: false },
+        minute: { enabled: true, step: 1 },
+        hour: { enabled: true },
+      },
+      toolbox: {
+        calendarSwitch: { enabled: false },
+        todayButton: { enabled: true, text: { fa: "امروز" } },
+        submitButton: { enabled: true, text: { fa: "تأیید" } },
+      },
+      onSelect: function (unix) {
+        selectedDeadline = new Date(unix);
+      },
+    });
+    datepickerReady = true;
+    console.log("✅ Datepicker ready");
+    return true;
+  } catch (e) {
+    console.warn("⚠️ Datepicker init failed:", e);
+    return false;
+  }
 }
+
+// تلاش هر ۳۰۰ms تا ۱۰ بار برای راه‌اندازی تقویم
+let dpAttempts = 0;
+const dpInterval = setInterval(() => {
+  dpAttempts++;
+  if (tryInitDatepicker() || dpAttempts > 10) {
+    clearInterval(dpInterval);
+  }
+}, 300);
 
 /* ============================================================
    تم تاریک
    ============================================================ */
-switchCheckDarken?.addEventListener("click", () => {
-  document.body.classList.toggle("dark-background");
-  const icon = switchCheckDarken.querySelector("i");
-  if (!icon) return;
-  if (document.body.classList.contains("dark-background")) {
-    icon.classList.remove("bi-moon-stars");
-    icon.classList.add("bi-sun");
-  } else {
-    icon.classList.remove("bi-sun");
-    icon.classList.add("bi-moon-stars");
-  }
-});
+try {
+  switchCheckDarken?.addEventListener("click", () => {
+    document.body.classList.toggle("dark-background");
+    const icon = switchCheckDarken.querySelector("i");
+    if (!icon) return;
+    if (document.body.classList.contains("dark-background")) {
+      icon.classList.remove("bi-moon-stars");
+      icon.classList.add("bi-sun");
+    } else {
+      icon.classList.remove("bi-sun");
+      icon.classList.add("bi-moon-stars");
+    }
+  });
+} catch (e) { console.warn(e); }
 
 /* ============================================================
-   توابع کمکی تاریخ
+   توابع تاریخ
    ============================================================ */
-function formatPersianDateTime(date) {
-  try {
-    return new Intl.DateTimeFormat("fa-IR", {
-      year: "numeric", month: "long", day: "numeric",
-      hour: "2-digit", minute: "2-digit", hour12: false,
-    }).format(date);
-  } catch (e) { return date.toLocaleString("fa-IR"); }
-}
-
 function formatPersianDate(date) {
   try {
     return new Intl.DateTimeFormat("fa-IR", {
@@ -142,20 +148,28 @@ function formatPersianTime(date) {
   } catch (e) { return date.toLocaleTimeString("fa-IR"); }
 }
 
+function formatPersianDateTime(date) {
+  try {
+    return new Intl.DateTimeFormat("fa-IR", {
+      year: "numeric", month: "long", day: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).format(date);
+  } catch (e) { return date.toString(); }
+}
+
 function dateToPersianInput(date) {
-  if (typeof persianDate === "undefined") {
-    return "";
-  }
-  const pd = new persianDate(new Date(date));
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pd.year()}/${pad(pd.month())}/${pad(pd.date())} ${pad(pd.hour())}:${pad(pd.minute())}`;
+  if (typeof persianDate === "undefined") return "";
+  try {
+    const pd = new persianDate(new Date(date));
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pd.year()}/${pad(pd.month())}/${pad(pd.date())} ${pad(pd.hour())}:${pad(pd.minute())}`;
+  } catch (e) { return ""; }
 }
 
 function timeUntil(targetDate) {
   const now = new Date();
   const diff = targetDate - now;
   const absDiff = Math.abs(diff);
-
   const minutes = Math.floor(absDiff / 60000);
   const hours = Math.floor(absDiff / 3600000);
   const days = Math.floor(absDiff / 86400000);
@@ -173,7 +187,6 @@ function getDeadlineStatus(deadline) {
   const now = new Date();
   const diff = deadline - now;
   const hours = diff / 3600000;
-
   if (diff < 0) return "overdue";
   if (hours < 24) return "urgent";
   if (hours < 72) return "soon";
@@ -184,44 +197,56 @@ function getDeadlineStatus(deadline) {
    IndexedDB
    ============================================================ */
 function openDatabase() {
-  const request = window.indexedDB.open("To do", 4);
+  try {
+    const request = window.indexedDB.open("To do", 4);
 
-  request.onerror = () => {
-    console.error("❌ DB Failed to Open");
-    showToast("خطا در باز کردن دیتابیس", "danger");
-    hideLoader();
-  };
+    request.onerror = (e) => {
+      console.error("❌ DB Failed", e);
+      showToast("خطا در باز کردن دیتابیس", "danger");
+      hideLoader();
+    };
 
-  request.onsuccess = () => {
-    console.log("✅ DB Opened");
-    db = request.result;
-    displayData();
-  };
+    request.onblocked = () => {
+      console.warn("⚠️ DB blocked - tab دیگری باز است");
+    };
 
-  request.onupgradeneeded = (e) => {
-    const dbLocal = e.target.result;
-    let store;
+    request.onsuccess = () => {
+      console.log("✅ DB Opened");
+      db = request.result;
+      try {
+        displayData();
+      } catch (e) {
+        console.error("displayData error:", e);
+      }
+    };
 
-    if (!dbLocal.objectStoreNames.contains("To do")) {
-      store = dbLocal.createObjectStore("To do", {
-        keyPath: "id", autoIncrement: true,
-      });
-      store.createIndex("Title", "Title", { unique: false });
-      store.createIndex("Body", "Body", { unique: false });
-      store.createIndex("completed", "completed", { unique: false });
-      store.createIndex("createdAt", "createdAt", { unique: false });
-      store.createIndex("deadline", "deadline", { unique: false });
-    } else {
-      store = e.currentTarget.transaction.objectStore("To do");
-      if (!store.indexNames.contains("completed"))
+    request.onupgradeneeded = (e) => {
+      const dbLocal = e.target.result;
+      let store;
+
+      if (!dbLocal.objectStoreNames.contains("To do")) {
+        store = dbLocal.createObjectStore("To do", {
+          keyPath: "id", autoIncrement: true,
+        });
+        store.createIndex("Title", "Title", { unique: false });
+        store.createIndex("Body", "Body", { unique: false });
         store.createIndex("completed", "completed", { unique: false });
-      if (!store.indexNames.contains("createdAt"))
         store.createIndex("createdAt", "createdAt", { unique: false });
-      if (!store.indexNames.contains("deadline"))
         store.createIndex("deadline", "deadline", { unique: false });
-    }
-    console.log("✅ DB setup complete");
-  };
+      } else {
+        store = e.currentTarget.transaction.objectStore("To do");
+        if (!store.indexNames.contains("completed"))
+          store.createIndex("completed", "completed", { unique: false });
+        if (!store.indexNames.contains("createdAt"))
+          store.createIndex("createdAt", "createdAt", { unique: false });
+        if (!store.indexNames.contains("deadline"))
+          store.createIndex("deadline", "deadline", { unique: false });
+      }
+    };
+  } catch (e) {
+    console.error("openDatabase failed:", e);
+    hideLoader();
+  }
 }
 
 /* ============================================================
@@ -229,45 +254,42 @@ function openDatabase() {
    ============================================================ */
 function addData(callback) {
   if (!db) { showToast("دیتابیس آماده نیست", "danger"); return; }
+  try {
+    const newItem = {
+      Title: titleTaskinput.value.trim(),
+      Body: titledisinput.value.trim(),
+      completed: false,
+      createdAt: new Date(),
+      deadline: selectedDeadline || null,
+    };
 
-  const newItem = {
-    Title: titleTaskinput.value.trim(),
-    Body: titledisinput.value.trim(),
-    completed: false,
-    createdAt: new Date(),
-    deadline: selectedDeadline || null,
-  };
-
-  const tx = db.transaction(["To do"], "readwrite");
-  tx.objectStore("To do").add(newItem);
-
-  tx.oncomplete = () => {
-    callback?.();
-    displayData();
-  };
-
-  tx.onerror = () => {
+    const tx = db.transaction(["To do"], "readwrite");
+    tx.objectStore("To do").add(newItem);
+    tx.oncomplete = () => { callback?.(); displayData(); };
+    tx.onerror = () => showToast("خطا در ذخیره تسک", "danger");
+  } catch (e) {
+    console.error("addData error:", e);
     showToast("خطا در ذخیره تسک", "danger");
-  };
+  }
 }
 
 function updateTask(id, updates, callback) {
   if (!db) return;
-  const tx = db.transaction(["To do"], "readwrite");
-  const store = tx.objectStore("To do");
-  const req = store.get(id);
+  try {
+    const tx = db.transaction(["To do"], "readwrite");
+    const store = tx.objectStore("To do");
+    const req = store.get(id);
 
-  req.onsuccess = () => {
-    const data = req.result;
-    if (!data) return;
-    Object.assign(data, updates);
-    store.put(data);
-
-    tx.oncomplete = () => {
-      callback?.();
-      displayData();
+    req.onsuccess = () => {
+      const data = req.result;
+      if (!data) return;
+      Object.assign(data, updates);
+      store.put(data);
+      tx.oncomplete = () => { callback?.(); displayData(); };
     };
-  };
+  } catch (e) {
+    console.error("updateTask error:", e);
+  }
 }
 
 function updateTaskStatus(id, completed) {
@@ -278,9 +300,27 @@ function updateTaskStatus(id, completed) {
 
 function deleteData(id) {
   if (!db) return;
-  const tx = db.transaction(["To do"], "readwrite");
-  tx.objectStore("To do").delete(id);
-  tx.oncomplete = () => displayData();
+  try {
+    const tx = db.transaction(["To do"], "readwrite");
+    tx.objectStore("To do").delete(id);
+    tx.oncomplete = () => displayData();
+  } catch (e) {
+    console.error("deleteData error:", e);
+  }
+}
+
+function getAllTasks() {
+  return new Promise((resolve) => {
+    if (!db) return resolve([]);
+    try {
+      const tx = db.transaction(["To do"], "readonly");
+      const req = tx.objectStore("To do").getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    } catch (e) {
+      resolve([]);
+    }
+  });
 }
 
 /* ============================================================
@@ -297,63 +337,71 @@ function toggleCompletedTasks() {
 }
 
 function displayData() {
-  if (!db) return;
-  while (from.firstChild) from.removeChild(from.firstChild);
+  if (!db || !from) return;
 
-  const tx = db.transaction(["To do"], "readonly");
-  const req = tx.objectStore("To do").index("createdAt").openCursor(null, "prev");
+  try {
+    while (from.firstChild) from.removeChild(from.firstChild);
 
-  let hasResults = false;
-  let completedCount = 0;
-  let totalCount = 0;
-  let urgentCount = 0;
+    const tx = db.transaction(["To do"], "readonly");
+    const req = tx.objectStore("To do").index("createdAt").openCursor(null, "prev");
 
-  req.onsuccess = (e) => {
-    const cursor = e.target.result;
+    let hasResults = false;
+    let completedCount = 0;
+    let totalCount = 0;
+    let urgentCount = 0;
 
-    if (!cursor) {
-      if (showOnlyCompleted && completedCount === 0) showNoCompletedTasksMessage();
-      else if (currentSearchTerm && !hasResults) showNoResultsMessage();
-      else if (totalCount === 0) checkEmptyTasks();
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
 
-      updateCount(completedCount, totalCount);
-      updateStats(totalCount, completedCount, urgentCount);
-      return;
-    }
+      if (!cursor) {
+        if (showOnlyCompleted && completedCount === 0) showNoCompletedTasksMessage();
+        else if (currentSearchTerm && !hasResults) showNoResultsMessage();
+        else if (totalCount === 0) checkEmptyTasks();
 
-    const value = cursor.value;
-    const title = (value.Title || "").trim();
-    const description = (value.Body || "").trim();
-    const completed = value.completed || false;
-    const taskId = value.id;
-    const createdAt = value.createdAt ? new Date(value.createdAt) : new Date();
-    const deadline = value.deadline ? new Date(value.deadline) : null;
+        updateCount(completedCount, totalCount);
+        updateStats(totalCount, completedCount, urgentCount);
+        return;
+      }
 
-    totalCount++;
+      const value = cursor.value;
+      const title = (value.Title || "").trim();
+      const description = (value.Body || "").trim();
+      const completed = value.completed || false;
+      const taskId = value.id;
+      const createdAt = value.createdAt ? new Date(value.createdAt) : new Date();
+      const deadline = value.deadline ? new Date(value.deadline) : null;
 
-    if (deadline && !completed) {
-      const status = getDeadlineStatus(deadline);
-      if (status === "urgent" || status === "overdue") urgentCount++;
-    }
+      totalCount++;
+      if (deadline && !completed) {
+        const status = getDeadlineStatus(deadline);
+        if (status === "urgent" || status === "overdue") urgentCount++;
+      }
 
-    if (title === "") { cursor.continue(); return; }
-    if (showOnlyCompleted && !completed) { cursor.continue(); return; }
+      if (title === "") { cursor.continue(); return; }
+      if (showOnlyCompleted && !completed) { cursor.continue(); return; }
 
-    if (currentSearchTerm) {
-      const tMatch = title.toLowerCase().includes(currentSearchTerm);
-      const dMatch = description.toLowerCase().includes(currentSearchTerm);
-      if (!tMatch && !dMatch) { cursor.continue(); return; }
-    }
+      if (currentSearchTerm) {
+        const tMatch = title.toLowerCase().includes(currentSearchTerm);
+        const dMatch = description.toLowerCase().includes(currentSearchTerm);
+        if (!tMatch && !dMatch) { cursor.continue(); return; }
+      }
 
-    hasResults = true;
-    if (completed) completedCount++;
+      hasResults = true;
+      if (completed) completedCount++;
 
-    from.appendChild(buildTaskElement({
-      taskId, title, description, completed, createdAt, deadline
-    }));
+      try {
+        from.appendChild(buildTaskElement({
+          taskId, title, description, completed, createdAt, deadline
+        }));
+      } catch (e) {
+        console.error("buildTaskElement error:", e);
+      }
 
-    cursor.continue();
-  };
+      cursor.continue();
+    };
+  } catch (e) {
+    console.error("displayData error:", e);
+  }
 }
 
 /* ============================================================
@@ -376,7 +424,8 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
   const titleEl = document.createElement("div");
   titleEl.className = "task-title";
   if (currentSearchTerm && title.toLowerCase().includes(currentSearchTerm)) {
-    const re = new RegExp(`(${currentSearchTerm})`, "gi");
+    const safe = currentSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(${safe})`, "gi");
     titleEl.innerHTML = title.replace(re, '<span class="bg-warning px-1 rounded">$1</span>');
   } else {
     titleEl.textContent = title;
@@ -413,7 +462,8 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
   descEl.className = "task-desc";
   if (description) {
     if (currentSearchTerm && description.toLowerCase().includes(currentSearchTerm)) {
-      const re = new RegExp(`(${currentSearchTerm})`, "gi");
+      const safe = currentSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`(${safe})`, "gi");
       descEl.innerHTML = description.replace(re, '<span class="bg-warning px-1 rounded">$1</span>');
     } else {
       descEl.textContent = description;
@@ -450,7 +500,7 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
   doneToggle.innerHTML = `
     <input type="checkbox" ${completed ? "checked" : ""}>
     <span class="check-icon"><i class="bi bi-check-lg"></i></span>
-    <span class="${completed ? "text-success fw-bold" : "text-muted"}">
+    <span class="${completed ? "text-success fw-bold" : ""}">
       ${completed ? "انجام شده" : "انجام نشده"}
     </span>
   `;
@@ -507,32 +557,36 @@ function openCreateForm() {
 
 function openEditForm(id) {
   if (!db) return;
-  const tx = db.transaction(["To do"], "readonly");
-  const req = tx.objectStore("To do").get(id);
+  try {
+    const tx = db.transaction(["To do"], "readonly");
+    const req = tx.objectStore("To do").get(id);
 
-  req.onsuccess = () => {
-    const data = req.result;
-    if (!data) return;
+    req.onsuccess = () => {
+      const data = req.result;
+      if (!data) return;
 
-    editingTaskId = id;
-    titleTaskinput.value = data.Title || "";
-    titledisinput.value = data.Body || "";
+      editingTaskId = id;
+      titleTaskinput.value = data.Title || "";
+      titledisinput.value = data.Body || "";
 
-    if (data.deadline) {
-      selectedDeadline = new Date(data.deadline);
-      taskDeadlineInput.value = dateToPersianInput(selectedDeadline);
-    } else {
-      selectedDeadline = null;
-      taskDeadlineInput.value = "";
-    }
+      if (data.deadline) {
+        selectedDeadline = new Date(data.deadline);
+        taskDeadlineInput.value = dateToPersianInput(selectedDeadline);
+      } else {
+        selectedDeadline = null;
+        taskDeadlineInput.value = "";
+      }
 
-    formTitle.textContent = "ویرایش تسک";
-    submitText.textContent = "ذخیره تغییرات";
-    formIcon.className = "bi bi-pencil-square";
+      formTitle.textContent = "ویرایش تسک";
+      submitText.textContent = "ذخیره تغییرات";
+      formIcon.className = "bi bi-pencil-square";
 
-    display.classList.remove("dis-hide");
-    adduserback.classList.remove("dis-hide");
-  };
+      display.classList.remove("dis-hide");
+      adduserback.classList.remove("dis-hide");
+    };
+  } catch (e) {
+    console.error("openEditForm error:", e);
+  }
 }
 
 function resetForm() {
@@ -541,9 +595,9 @@ function resetForm() {
   if (titleTaskinput) titleTaskinput.value = "";
   if (titledisinput) titledisinput.value = "";
   if (taskDeadlineInput) taskDeadlineInput.value = "";
-  formTitle.textContent = "ایجاد تسک جدید";
-  submitText.textContent = "ایجاد تسک";
-  formIcon.className = "bi bi-plus-circle";
+  if (formTitle) formTitle.textContent = "ایجاد تسک جدید";
+  if (submitText) submitText.textContent = "ایجاد تسک";
+  if (formIcon) formIcon.className = "bi bi-plus-circle";
 }
 
 function closeForm() {
@@ -553,24 +607,26 @@ function closeForm() {
 }
 
 /* ============================================================
-   تأیید حذف
+   حذف
    ============================================================ */
 function openDeleteConfirm(taskId) {
+  pendingDeleteId = taskId;
   ask.classList.remove("dis-hide");
   adduserback.classList.remove("dis-hide");
+}
 
-  const yasdelete = document.getElementById("yasdelete");
-  if (!yasdelete) return;
+function closeDeleteConfirm() {
+  pendingDeleteId = null;
+  ask.classList.add("dis-hide");
+  adduserback.classList.add("dis-hide");
+}
 
-  const newYes = yasdelete.cloneNode(true);
-  yasdelete.parentNode.replaceChild(newYes, yasdelete);
-
-  newYes.addEventListener("click", () => {
-    ask.classList.add("dis-hide");
-    adduserback.classList.add("dis-hide");
-    deleteData(taskId);
+function confirmDelete() {
+  if (pendingDeleteId !== null) {
+    deleteData(pendingDeleteId);
     showToast("تسک حذف شد", "success");
-  });
+  }
+  closeDeleteConfirm();
 }
 
 /* ============================================================
@@ -581,7 +637,7 @@ function showNoResultsMessage() {
     <div class="empty-state">
       <div class="icon"><i class="bi bi-search"></i></div>
       <h5>نتیجه‌ای یافت نشد</h5>
-      <p class="text-muted">هیچ تسکی با عبارت "${currentSearchTerm}" یافت نشد</p>
+      <p>هیچ تسکی با عبارت "${currentSearchTerm}" یافت نشد</p>
     </div>
   `;
 }
@@ -591,7 +647,7 @@ function showNoCompletedTasksMessage() {
     <div class="empty-state">
       <div class="icon"><i class="bi bi-check2-circle"></i></div>
       <h5>تسک انجام شده‌ای وجود ندارد</h5>
-      <p class="text-muted">هنوز هیچ تسکی را انجام نداده‌اید</p>
+      <p>هنوز هیچ تسکی را انجام نداده‌اید</p>
     </div>
   `;
 }
@@ -611,7 +667,7 @@ function checkEmptyTasks() {
     msg.innerHTML = `
       <div class="icon"><i class="bi bi-clipboard2-check"></i></div>
       <h5>هیچ تسکی نداری!</h5>
-      <p class="text-muted">برای شروع روی دکمه + بالا کلیک کن</p>
+      <p>برای شروع روی دکمه + پایین صفحه کلیک کن</p>
     `;
     from.appendChild(msg);
   }, 100);
@@ -623,7 +679,7 @@ function checkEmptyTasks() {
 function updateCount(completedCount, totalCount) {
   setTimeout(() => {
     const countEl = document.getElementById("count");
-    if (!countEl) return;
+    if (!countEl || !from) return;
 
     if (showOnlyCompleted) countEl.textContent = completedCount;
     else if (currentSearchTerm) countEl.textContent = from.querySelectorAll(".task").length;
@@ -645,76 +701,94 @@ function updateStats(total, done, urgent) {
 /* ============================================================
    رویدادها
    ============================================================ */
-create?.addEventListener("click", openCreateForm);
-adduserback?.addEventListener("click", closeForm);
-cancelForm?.addEventListener("click", closeForm);
-nodeleted?.addEventListener("click", closeForm);
+function bindEvents() {
+  fabAdd?.addEventListener("click", openCreateForm);
+  cancelForm?.addEventListener("click", closeForm);
+  nodeleted?.addEventListener("click", closeDeleteConfirm);
+  yasdelete?.addEventListener("click", confirmDelete);
 
-create2?.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+  adduserback?.addEventListener("click", () => {
+    closeForm();
+    closeDeleteConfirm();
+  });
 
-  const title = titleTaskinput?.value.trim() || "";
-  if (!title) {
-    showToast("عنوان تسک را وارد کنید!", "warning");
-    titleTaskinput?.focus();
-    return;
-  }
-
-  if (editingTaskId !== null) {
-    updateTask(editingTaskId, {
-      Title: title,
-      Body: titledisinput.value.trim(),
-      deadline: selectedDeadline,
-    }, () => {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
       closeForm();
-      showToast("تسک با موفقیت ویرایش شد", "success");
-    });
-  } else {
-    addData(() => {
-      closeForm();
-      showToast("تسک جدید اضافه شد", "success");
-    });
-  }
-});
+      closeDeleteConfirm();
+    }
+  });
 
-searchInput?.addEventListener("input", function () {
-  searchTasks(this.value);
-});
+  create2?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-searchInput?.addEventListener("keydown", function (e) {
-  if (e.key === "Escape") {
-    this.value = "";
-    currentSearchTerm = "";
-    displayData();
-  }
-});
+    const title = titleTaskinput?.value.trim() || "";
+    if (!title) {
+      showToast("عنوان تسک را وارد کنید!", "warning");
+      titleTaskinput?.focus();
+      return;
+    }
 
-switchCheckDefault?.addEventListener("change", toggleCompletedTasks);
+    if (editingTaskId !== null) {
+      updateTask(editingTaskId, {
+        Title: title,
+        Body: titledisinput.value.trim(),
+        deadline: selectedDeadline,
+      }, () => {
+        closeForm();
+        showToast("تسک با موفقیت ویرایش شد", "success");
+      });
+    } else {
+      addData(() => {
+        closeForm();
+        showToast("تسک جدید اضافه شد", "success");
+      });
+    }
+  });
 
-document.addEventListener("submit", (e) => e.preventDefault());
+  searchInput?.addEventListener("input", function () {
+    searchTasks(this.value);
+  });
+
+  searchInput?.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      this.value = "";
+      currentSearchTerm = "";
+      displayData();
+    }
+  });
+
+  switchCheckDefault?.addEventListener("change", toggleCompletedTasks);
+
+  document.addEventListener("submit", (e) => e.preventDefault());
+
+  // نوتیفیکیشن
+  enableNotifBtn?.addEventListener("click", async () => {
+    if (!("Notification" in window)) {
+      showToast("مرورگر شما از نوتیفیکیشن پشتیبانی نمی‌کند", "warning");
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === "granted") {
+        showToast("نوتیفیکیشن فعال شد ✅", "success");
+        enableNotifBtn.classList.add("active");
+      } else {
+        showToast("اجازه نوتیفیکیشن داده نشد", "danger");
+      }
+    } catch (err) {
+      showToast("خطا در فعال‌سازی نوتیفیکیشن", "danger");
+    }
+  });
+
+  // PDF
+  exportPdfBtn?.addEventListener("click", generateInvoicePDF);
+}
 
 /* ============================================================
    نوتیفیکیشن
    ============================================================ */
-enableNotifBtn?.addEventListener("click", async () => {
-  if (!("Notification" in window)) {
-    showToast("مرورگر شما از نوتیفیکیشن پشتیبانی نمی‌کند", "warning");
-    return;
-  }
-  try {
-    const perm = await Notification.requestPermission();
-    if (perm === "granted") {
-      showToast("نوتیفیکیشن فعال شد ✅", "success");
-      enableNotifBtn.classList.add("active");
-    } else {
-      showToast("اجازه نوتیفیکیشن داده نشد", "danger");
-    }
-  } catch (err) {
-    showToast("خطا در فعال‌سازی نوتیفیکیشن", "danger");
-  }
-});
-
 function sendNotification(title, body) {
   if (!("Notification" in window)) return;
   if (Notification.permission === "granted") {
@@ -742,7 +816,7 @@ function showToast(message, type = "info") {
 }
 
 /* ============================================================
-   بررسی ددلاین
+   ددلاین
    ============================================================ */
 function startDeadlineChecker() {
   checkDeadlines();
@@ -751,53 +825,287 @@ function startDeadlineChecker() {
 
 function checkDeadlines() {
   if (!db) return;
-  const tx = db.transaction(["To do"], "readonly");
-  const req = tx.objectStore("To do").getAll();
+  try {
+    const tx = db.transaction(["To do"], "readonly");
+    const req = tx.objectStore("To do").getAll();
 
-  req.onsuccess = () => {
-    const tasks = req.result || [];
-    const now = new Date();
+    req.onsuccess = () => {
+      const tasks = req.result || [];
+      const now = new Date();
 
-    tasks.forEach((task) => {
-      if (task.completed || !task.deadline) return;
+      tasks.forEach((task) => {
+        if (task.completed || !task.deadline) return;
 
-      const deadline = new Date(task.deadline);
-      const diff = deadline - now;
-      const taskId = task.id;
+        const deadline = new Date(task.deadline);
+        const diff = deadline - now;
+        const taskId = task.id;
 
-      if (diff > 0 && diff < 3600000 && !notifiedTasks.has("soon-" + taskId)) {
-        notifiedTasks.add("soon-" + taskId);
-        sendNotification("⏰ نزدیک به ددلاین", `"${task.Title}" کمتر از ۱ ساعت دیگر موعدش است`);
-        showToast(`⏰ "${task.Title}" نزدیک به ددلاین`, "warning");
-      }
+        if (diff > 0 && diff < 3600000 && !notifiedTasks.has("soon-" + taskId)) {
+          notifiedTasks.add("soon-" + taskId);
+          sendNotification("⏰ نزدیک به ددلاین", `"${task.Title}" کمتر از ۱ ساعت دیگر موعدش است`);
+          showToast(`⏰ "${task.Title}" نزدیک به ددلاین`, "warning");
+        }
 
-      if (diff <= 0 && diff > -60000 && !notifiedTasks.has("now-" + taskId)) {
-        notifiedTasks.add("now-" + taskId);
-        sendNotification("🔴 ددلاین رسید!", `"${task.Title}" به موعد خود رسید`);
-        showToast(`🔴 ددلاین "${task.Title}" رسید!`, "danger");
-      }
-    });
-  };
+        if (diff <= 0 && diff > -60000 && !notifiedTasks.has("now-" + taskId)) {
+          notifiedTasks.add("now-" + taskId);
+          sendNotification("🔴 ددلاین رسید!", `"${task.Title}" به موعد خود رسید`);
+          showToast(`🔴 ددلاین "${task.Title}" رسید!`, "danger");
+        }
+      });
+    };
+  } catch (e) {
+    console.error("checkDeadlines error:", e);
+  }
 }
 
 /* ============================================================
-   شروع برنامه
+   PDF
    ============================================================ */
-function init() {
-  openDatabase();
+let _vazirFontCache = null;
 
-  // تقویم بعد از لود jQuery
-  if (window.jQuery) {
-    initPersianDatepicker();
-  } else {
-    window.addEventListener("load", initPersianDatepicker);
+async function getVazirFont() {
+  if (_vazirFontCache) return _vazirFontCache;
+  const fontUrl = "https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/ttf/Vazirmatn-Regular.ttf";
+  const res = await fetch(fontUrl);
+  const buffer = await res.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  _vazirFontCache = btoa(binary);
+  return _vazirFontCache;
+}
+
+async function generateInvoicePDF() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showToast("کتابخانه PDF بارگذاری نشده", "danger");
+    return;
   }
 
-  startDeadlineChecker();
+  showToast("در حال ساخت فاکتور...", "info");
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const allTasks = await getAllTasks();
+
+    if (!allTasks || allTasks.length === 0) {
+      showToast("هیچ تسکی برای فاکتور وجود ندارد", "warning");
+      return;
+    }
+
+    allTasks.sort((a, b) => {
+      const da = new Date(a.createdAt || 0);
+      const dbb = new Date(b.createdAt || 0);
+      return dbb - da;
+    });
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    let fontLoaded = false;
+    try {
+      const fontBase64 = await getVazirFont();
+      doc.addFileToVFS("Vazirmatn-Regular.ttf", fontBase64);
+      doc.addFont("Vazirmatn-Regular.ttf", "Vazirmatn", "normal");
+      doc.setFont("Vazirmatn");
+      fontLoaded = true;
+    } catch (err) {
+      console.warn("فونت لود نشد", err);
+    }
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentW = pageW - margin * 2;
+
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageW, 35, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    if (fontLoaded) doc.setFont("Vazirmatn", "normal");
+    doc.text("فاکتور وظایف و سفارشات", pageW - margin, 15, { align: "right" });
+
+    doc.setFontSize(11);
+    doc.text(`تاریخ صدور: ${formatPersianDateTime(new Date())}`, pageW - margin, 25, { align: "right" });
+
+    const invoiceNo = "INV-" + Date.now().toString().slice(-8);
+    doc.text(`شماره: ${invoiceNo}`, margin, 25, { align: "left" });
+
+    let y = 45;
+    const total = allTasks.length;
+    const doneCount = allTasks.filter((t) => t.completed).length;
+    const pendingCount = total - doneCount;
+
+    const cardW = (contentW - 8) / 3;
+    const cardH = 20;
+    const cards = [
+      { label: "کل تسک‌ها", value: total, color: [37, 99, 235] },
+      { label: "انجام شده", value: doneCount, color: [22, 163, 74] },
+      { label: "در انتظار", value: pendingCount, color: [245, 158, 11] },
+    ];
+
+    cards.forEach((card, i) => {
+      const x = pageW - margin - (i + 1) * cardW - i * 4;
+      doc.setFillColor(card.color[0], card.color[1], card.color[2]);
+      doc.roundedRect(x, y, cardW, cardH, 3, 3, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      if (fontLoaded) doc.setFont("Vazirmatn", "normal");
+      doc.text(card.label, x + cardW / 2, y + 7, { align: "center" });
+
+      doc.setFontSize(14);
+      doc.text(String(card.value), x + cardW / 2, y + 16, { align: "center" });
+    });
+
+    y += cardH + 10;
+
+    doc.setFillColor(30, 41, 59);
+    doc.rect(margin, y, contentW, 9, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    if (fontLoaded) doc.setFont("Vazirmatn", "normal");
+
+    const colTitleX = pageW - margin - 3;
+    const colDeadlineX = pageW - margin - contentW * 0.55;
+    const colStatusX = pageW - margin - contentW * 0.85;
+
+    doc.text("عنوان", colTitleX, y + 6, { align: "right" });
+    doc.text("ددلاین", colDeadlineX, y + 6, { align: "center" });
+    doc.text("وضعیت", colStatusX, y + 6, { align: "center" });
+
+    y += 9;
+
+    const rowH = 8;
+    let rowIndex = 0;
+
+    for (const task of allTasks) {
+      if (y + rowH > pageH - 25) {
+        doc.addPage();
+        y = margin;
+        doc.setFillColor(30, 41, 59);
+        doc.rect(margin, y, contentW, 9, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text("عنوان", colTitleX, y + 6, { align: "right" });
+        doc.text("ددلاین", colDeadlineX, y + 6, { align: "center" });
+        doc.text("وضعیت", colStatusX, y + 6, { align: "center" });
+        y += 9;
+      }
+
+      if (rowIndex % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y, contentW, rowH, "F");
+      }
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, y + rowH, pageW - margin, y + rowH);
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(8);
+
+      let titleTxt = (task.Title || "بدون عنوان").trim();
+      if (titleTxt.length > 30) titleTxt = titleTxt.substring(0, 28) + "…";
+      doc.text(titleTxt, colTitleX, y + 5.5, { align: "right" });
+
+      let deadlineTxt = "—";
+      if (task.deadline) {
+        const d = new Date(task.deadline);
+        deadlineTxt = `${formatPersianDate(d)} ${formatPersianTime(d)}`;
+      }
+      doc.text(deadlineTxt, colDeadlineX, y + 5.5, { align: "center" });
+
+      if (task.completed) {
+        doc.setTextColor(22, 163, 74);
+        doc.text("انجام شده", colStatusX, y + 5.5, { align: "center" });
+      } else {
+        const status = task.deadline ? getDeadlineStatus(new Date(task.deadline)) : null;
+        if (status === "overdue") {
+          doc.setTextColor(220, 38, 38);
+          doc.text("گذشته", colStatusX, y + 5.5, { align: "center" });
+        } else if (status === "urgent") {
+          doc.setTextColor(245, 158, 11);
+          doc.text("فوری", colStatusX, y + 5.5, { align: "center" });
+        } else {
+          doc.setTextColor(100, 116, 139);
+          doc.text("در انتظار", colStatusX, y + 5.5, { align: "center" });
+        }
+      }
+
+      y += rowH;
+      rowIndex++;
+    }
+
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, pageH - 15, pageW - margin, pageH - 15);
+
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(8);
+      if (fontLoaded) doc.setFont("Vazirmatn", "normal");
+      doc.text("مدیریت کارها — فاکتور خودکار", margin, pageH - 9, { align: "left" });
+      doc.text(`صفحه ${p} از ${totalPages}`, pageW - margin, pageH - 9, { align: "right" });
+    }
+
+    const fileName = `invoice-${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(fileName);
+    showToast("فاکتور PDF دانلود شد ✅", "success");
+  } catch (err) {
+    console.error("PDF error:", err);
+    showToast("خطا در ساخت فاکتور", "danger");
+  }
+}
+
+/* ============================================================
+   PWA Install
+   ============================================================ */
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+window.addEventListener("appinstalled", () => {
+  showToast("اپ با موفقیت نصب شد 🎉", "success");
+  deferredPrompt = null;
+});
+
+/* ============================================================
+   شروع - اجرای تضمینی
+   ============================================================ */
+function init() {
+  console.log("🚀 init() called");
+
+  try {
+    bindEvents();
+    console.log("✅ Events bound");
+  } catch (e) {
+    console.error("❌ bindEvents failed:", e);
+  }
+
+  try {
+    openDatabase();
+    console.log("✅ openDatabase called");
+  } catch (e) {
+    console.error("❌ openDatabase failed:", e);
+    hideLoader();
+  }
+
+  try {
+    startDeadlineChecker();
+  } catch (e) {
+    console.error("❌ deadline checker failed:", e);
+  }
+
   updateCount(0, 0);
   checkEmptyTasks();
 }
 
+// اجرای init در زمان درست
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
 } else {
