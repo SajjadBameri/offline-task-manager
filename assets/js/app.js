@@ -1008,11 +1008,11 @@ function buildInvoiceHTML(task) {
   ` : "";
 
   return `
-    <div class="invoice-card" id="invoiceCard">
+    <div class="invoice-card" id="invoiceCard" dir="rtl">
       <div class="invoice-header">
-        <h1 class="invoice-store-name">${STORE_NAME}</h1>
-        <p class="invoice-store-sub">${STORE_TAGLINE}</p>
-        <span class="invoice-badge">
+        <h1 class="invoice-store-name" dir="rtl" lang="fa">${STORE_NAME}</h1>
+        <p class="invoice-store-sub" dir="rtl" lang="fa">${STORE_TAGLINE}</p>
+        <span class="invoice-badge" dir="rtl" lang="fa">
           <i class="bi bi-patch-check-fill"></i> فاکتور رسمی
         </span>
       </div>
@@ -1020,25 +1020,25 @@ function buildInvoiceHTML(task) {
       <div class="invoice-divider"></div>
 
       <div class="invoice-meta">
-        <div class="invoice-meta-item">
+        <div class="invoice-meta-item" dir="rtl">
           <span class="label">شماره فاکتور</span>
           <span class="value">${invoiceNo}</span>
         </div>
-        <div class="invoice-meta-item">
+        <div class="invoice-meta-item" dir="rtl">
           <span class="label">تاریخ صدور</span>
           <span class="value">${formatPersianDate(new Date())}</span>
         </div>
       </div>
 
       <div class="invoice-body">
-        <h3 class="invoice-section-title">
+        <h3 class="invoice-section-title" dir="rtl">
           <i class="bi bi-box-seam-fill"></i>
           <span>جزئیات سفارش</span>
         </h3>
 
-        <div class="invoice-item">
-          <h4 class="invoice-item-title">${title}</h4>
-          ${description ? `<p class="invoice-item-desc">${description}</p>` : ""}
+        <div class="invoice-item" dir="rtl">
+          <h4 class="invoice-item-title" dir="rtl" lang="fa">${title}</h4>
+          ${description ? `<p class="invoice-item-desc" dir="rtl" lang="fa">${description}</p>` : ""}
           <div class="invoice-item-rows">
             ${itemRows.join("")}
           </div>
@@ -1047,17 +1047,16 @@ function buildInvoiceHTML(task) {
         ${totalSection}
       </div>
 
-      <div class="invoice-footer">
-        <p class="thanks">🙏 از خرید شما سپاسگزاریم</p>
-        <p class="contact">
+      <div class="invoice-footer" dir="rtl">
+        <p class="thanks" dir="rtl" lang="fa">🙏 از خرید شما سپاسگزاریم</p>
+        <p class="contact" dir="rtl" lang="fa">
           جهت سفارشات بیشتر و پیگیری با ما در تماس باشید
         </p>
-        <p class="watermark">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
+        <p class="watermark" dir="rtl" lang="fa">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
       </div>
     </div>
   `;
 }
-
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -1074,18 +1073,59 @@ async function generateInvoiceImage() {
   if (!card) return null;
 
   try {
+    // 👇 مطمئن شو فونت لود شده
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
     const canvas = await html2canvas(card, {
       scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
+      allowTaint: false,
       logging: false,
       windowWidth: card.scrollWidth,
       windowHeight: card.scrollHeight,
+      // 👇 مهم: قبل از رندر، استایل‌های اصلاحی رو تو کپی اعمال کن
+      onclone: function (clonedDoc) {
+        const clonedCard = clonedDoc.getElementById("invoiceCard");
+        if (!clonedCard) return;
+
+        // 👇 اعمال استایل مستقیم روی همه المان‌های متنی
+        const allElements = clonedCard.querySelectorAll("*");
+        allElements.forEach((el) => {
+          // جلوگیری از letter-spacing منفی
+          el.style.letterSpacing = "0px";
+          el.style.wordSpacing = "normal";
+
+          // برای عناصر متنی، RTL صریح
+          if (el.children.length === 0 && el.textContent.trim()) {
+            el.style.direction = "rtl";
+            el.style.unicodeBidi = "embed";
+            el.style.textAlign = el.style.textAlign || "right";
+          }
+        });
+
+        // 👇 مخصوص عنوان فروشگاه
+        const storeName = clonedCard.querySelector(".invoice-store-name");
+        if (storeName) {
+          storeName.style.fontFamily = "Vazirmatn, Vazir, Tahoma, sans-serif";
+          storeName.style.fontWeight = "800";
+          storeName.style.letterSpacing = "0px";
+          storeName.style.wordSpacing = "0px";
+          storeName.style.direction = "rtl";
+          storeName.style.textAlign = "right";
+          storeName.style.unicodeBidi = "embed";
+          storeName.style.whiteSpace = "nowrap";
+          storeName.style.lineHeight = "1.6";
+        }
+      },
     });
 
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         currentInvoiceBlob = blob;
+        console.log("✅ Invoice image ready:", blob?.size, "bytes");
         resolve(blob);
       }, "image/png", 1.0);
     });
