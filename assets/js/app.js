@@ -46,8 +46,8 @@ let currentInvoiceTaskId = null;
 let currentInvoiceBlob = null;
 let notifEnabled = false;
 
-const STORE_NAME = "نقل و نبات ممتاز سیستان";
-const STORE_TAGLINE = "کیفیت برتر، طعم اصیل";
+const STORE_NAME = "صورت حساب";
+const STORE_TAGLINE = "";
 
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
