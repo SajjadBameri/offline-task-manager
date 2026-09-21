@@ -2,7 +2,6 @@
    یادداشت‌یار - فایل اصلی برنامه
    ============================================================ */
 
-/* ---------- گرفتن المان‌ها ---------- */
 const load = document.getElementById("lode");
 const display = document.getElementById("display");
 const titleTaskinput = document.getElementById("titletask");
@@ -31,7 +30,6 @@ const invoiceRenderArea = document.getElementById("invoiceRenderArea");
 const shareInvoiceBtn = document.getElementById("shareInvoiceBtn");
 const closePreviewBtn = document.getElementById("closePreviewBtn");
 
-/* ---------- وضعیت ---------- */
 let db = null;
 let currentSearchTerm = "";
 let showOnlyCompleted = false;
@@ -47,17 +45,12 @@ let notifTimers = new Map();
 let currentInvoiceTaskId = null;
 let currentInvoiceBlob = null;
 
-/* ---------- ثابت‌ها ---------- */
 const STORE_NAME = "نقل و نبات ممتاز سیستان";
 const STORE_TAGLINE = "کیفیت برتر، طعم اصیل";
 
-/* ============================================================
-   توابع کمکی عدد و قیمت
-   ============================================================ */
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
-/* تبدیل ارقام فارسی/عربی به انگلیسی */
 function toEnglishDigits(str) {
   if (str === null || str === undefined) return "";
   return String(str).replace(/[۰-۹٠-٩]/g, (d) => {
@@ -69,13 +62,11 @@ function toEnglishDigits(str) {
   });
 }
 
-/* گرفتن فقط ارقام انگلیسی از یک رشته */
 function extractDigits(str) {
   if (!str) return "";
   return toEnglishDigits(String(str)).replace(/[^\d]/g, "");
 }
 
-/* تبدیل رشته قیمت به عدد */
 function parsePrice(priceStr) {
   const digits = extractDigits(priceStr);
   if (!digits) return 0;
@@ -83,7 +74,6 @@ function parsePrice(priceStr) {
   return isNaN(num) ? 0 : num;
 }
 
-/* فرمت قیمت برای نمایش (با ارقام فارسی) */
 function formatPrice(price) {
   if (price === null || price === undefined || price === "") return "";
   const num = typeof price === "number" ? price : parsePrice(price);
@@ -91,64 +81,31 @@ function formatPrice(price) {
   return num.toLocaleString("fa-IR");
 }
 
-/* فرمت زنده فیلد قیمت با حفظ موقعیت کرسر */
 function formatPriceInputLive(input) {
   if (!input) return;
-
   const rawValue = input.value;
   const caretPos = input.selectionStart || 0;
-
-  // چند رقم قبل از کرسر وجود داشت؟
   const digitsBeforeCaret = extractDigits(rawValue.slice(0, caretPos)).length;
-
-  // همه ارقام رو بگیر
   const allDigits = extractDigits(rawValue);
-
-  if (!allDigits) {
-    input.value = "";
-    return;
-  }
-
-  // صفرهای ابتدایی رو حذف کن
+  if (!allDigits) { input.value = ""; return; }
   const cleanDigits = allDigits.replace(/^0+/, "") || "0";
-
-  // عدد رو بساز
   const num = parseInt(cleanDigits, 10);
-  if (isNaN(num)) {
-    input.value = "";
-    return;
-  }
-
-  // فرمت با کاما و ارقام انگلیسی (چون dir=ltr هست)
-  // از en-US استفاده می‌کنیم که کاما بذاره
+  if (isNaN(num)) { input.value = ""; return; }
   const formatted = num.toLocaleString("en-US");
-
-  // موقعیت جدید کرسر رو پیدا کن (بر اساس تعداد رقم قبلش)
   let newCaret = formatted.length;
   if (digitsBeforeCaret > 0) {
     let count = 0;
     for (let i = 0; i < formatted.length; i++) {
       if (/\d/.test(formatted[i])) {
         count++;
-        if (count === digitsBeforeCaret) {
-          newCaret = i + 1;
-          break;
-        }
+        if (count === digitsBeforeCaret) { newCaret = i + 1; break; }
       }
     }
   }
-
   input.value = formatted;
-
-  // کرسر رو برگردون
-  try {
-    input.setSelectionRange(newCaret, newCaret);
-  } catch (e) { /* silent */ }
+  try { input.setSelectionRange(newCaret, newCaret); } catch (e) {}
 }
 
-/* ============================================================
-   لودر
-   ============================================================ */
 function hideLoader() {
   if (loaderHidden || !load) return;
   loaderHidden = true;
@@ -160,9 +117,7 @@ function hideLoader() {
       load.style.display = "none";
       load.classList.add("dis-hide");
     }, 450);
-  } catch (e) {
-    load.style.display = "none";
-  }
+  } catch (e) { load.style.display = "none"; }
 }
 
 window.addEventListener("load", () => setTimeout(hideLoader, 500));
@@ -174,15 +129,10 @@ if (document.readyState === "complete" || document.readyState === "interactive")
 setTimeout(hideLoader, 2500);
 window.addEventListener("error", hideLoader);
 
-/* ============================================================
-   Service Worker
-   ============================================================ */
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   try {
     swRegistration = await navigator.serviceWorker.register("./service-worker.js");
-    console.log("✅ SW registered:", swRegistration.scope);
-
     if ("periodicSync" in swRegistration) {
       try {
         const status = await navigator.permissions.query({ name: "periodic-background-sync" });
@@ -191,13 +141,10 @@ async function registerSW() {
             minInterval: 24 * 60 * 60 * 1000,
           });
         }
-      } catch (err) { /* silent */ }
+      } catch (err) {}
     }
-
     navigator.serviceWorker.addEventListener("message", handleSWMessage);
-  } catch (err) {
-    console.warn("⚠️ SW registration failed:", err);
-  }
+  } catch (err) {}
 }
 
 function handleSWMessage(event) {
@@ -209,14 +156,10 @@ function handleSWMessage(event) {
   }
 }
 
-/* ============================================================
-   تقویم شمسی
-   ============================================================ */
 function tryInitDatepicker() {
   if (datepickerReady) return true;
   if (typeof jQuery === "undefined") return false;
   if (!jQuery.fn || !jQuery.fn.persianDatepicker) return false;
-
   try {
     jQuery("#taskDeadline").persianDatepicker({
       format: "YYYY/MM/DD HH:mm",
@@ -224,9 +167,7 @@ function tryInitDatepicker() {
       autoClose: true,
       persianDigit: true,
       observer: true,
-      calendar: {
-        persian: { locale: "fa", showHint: true, leapYearMode: "algorithmic" },
-      },
+      calendar: { persian: { locale: "fa", showHint: true, leapYearMode: "algorithmic" } },
       timePicker: {
         enabled: true,
         meridiem: { enabled: false },
@@ -239,9 +180,7 @@ function tryInitDatepicker() {
         todayButton: { enabled: true, text: { fa: "امروز" } },
         submitButton: { enabled: true, text: { fa: "تأیید" } },
       },
-      onSelect: function (unix) {
-        selectedDeadline = new Date(unix);
-      },
+      onSelect: function (unix) { selectedDeadline = new Date(unix); },
     });
     datepickerReady = true;
     return true;
@@ -254,9 +193,6 @@ const dpInterval = setInterval(() => {
   if (tryInitDatepicker() || dpAttempts > 15) clearInterval(dpInterval);
 }, 300);
 
-/* ============================================================
-   تم تاریک
-   ============================================================ */
 try {
   switchCheckDarken?.addEventListener("click", () => {
     document.body.classList.toggle("dark-background");
@@ -270,24 +206,17 @@ try {
       icon.classList.add("bi-moon-stars");
     }
   });
-} catch (e) { /* silent */ }
+} catch (e) {}
 
-/* ============================================================
-   توابع تاریخ
-   ============================================================ */
 function formatPersianDate(date) {
   try {
-    return new Intl.DateTimeFormat("fa-IR", {
-      year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(date);
+    return new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
   } catch (e) { return date.toLocaleDateString("fa-IR"); }
 }
 
 function formatPersianTime(date) {
   try {
-    return new Intl.DateTimeFormat("fa-IR", {
-      hour: "2-digit", minute: "2-digit", hour12: false,
-    }).format(date);
+    return new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
   } catch (e) { return date.toLocaleTimeString("fa-IR"); }
 }
 
@@ -316,12 +245,10 @@ function timeUntil(targetDate) {
   const minutes = Math.floor(absDiff / 60000);
   const hours = Math.floor(absDiff / 3600000);
   const days = Math.floor(absDiff / 86400000);
-
   let text;
   if (minutes < 60) text = `${minutes} دقیقه`;
   else if (hours < 24) text = `${hours} ساعت`;
   else text = `${days} روز`;
-
   return diff >= 0 ? `${text} دیگر` : `${text} گذشته`;
 }
 
@@ -336,39 +263,27 @@ function getDeadlineStatus(deadline) {
   return "normal";
 }
 
-/* ============================================================
-   IndexedDB
-   ============================================================ */
 function openDatabase() {
   try {
     const request = window.indexedDB.open("To do", 6);
-
     request.onerror = (e) => {
-      console.error("❌ DB Failed", e);
       showToast("خطا در باز کردن دیتابیس", "danger");
       hideLoader();
     };
-
-    request.onblocked = () => console.warn("⚠️ DB blocked");
-
+    request.onblocked = () => {};
     request.onsuccess = () => {
-      console.log("✅ DB Opened");
       db = request.result;
       try {
         displayData();
         setTimeout(checkMissedNotifications, 1500);
         setTimeout(scheduleAllDeadlineTimers, 2000);
-      } catch (e) { console.error(e); }
+      } catch (e) {}
     };
-
     request.onupgradeneeded = (e) => {
       const dbLocal = e.target.result;
       let store;
-
       if (!dbLocal.objectStoreNames.contains("To do")) {
-        store = dbLocal.createObjectStore("To do", {
-          keyPath: "id", autoIncrement: true,
-        });
+        store = dbLocal.createObjectStore("To do", { keyPath: "id", autoIncrement: true });
         store.createIndex("Title", "Title", { unique: false });
         store.createIndex("Body", "Body", { unique: false });
         store.createIndex("completed", "completed", { unique: false });
@@ -376,23 +291,14 @@ function openDatabase() {
         store.createIndex("deadline", "deadline", { unique: false });
       } else {
         store = e.currentTarget.transaction.objectStore("To do");
-        if (!store.indexNames.contains("completed"))
-          store.createIndex("completed", "completed", { unique: false });
-        if (!store.indexNames.contains("createdAt"))
-          store.createIndex("createdAt", "createdAt", { unique: false });
-        if (!store.indexNames.contains("deadline"))
-          store.createIndex("deadline", "deadline", { unique: false });
+        if (!store.indexNames.contains("completed")) store.createIndex("completed", "completed", { unique: false });
+        if (!store.indexNames.contains("createdAt")) store.createIndex("createdAt", "createdAt", { unique: false });
+        if (!store.indexNames.contains("deadline")) store.createIndex("deadline", "deadline", { unique: false });
       }
     };
-  } catch (e) {
-    console.error("openDatabase failed:", e);
-    hideLoader();
-  }
+  } catch (e) { hideLoader(); }
 }
 
-/* ============================================================
-   CRUD
-   ============================================================ */
 function addData(callback) {
   if (!db) { showToast("دیتابیس آماده نیست", "danger"); return; }
   try {
@@ -406,7 +312,6 @@ function addData(callback) {
       deadline: selectedDeadline || null,
       lastNotificationAt: null,
     };
-
     const tx = db.transaction(["To do"], "readwrite");
     const req = tx.objectStore("To do").add(newItem);
     req.onsuccess = () => {
@@ -417,10 +322,7 @@ function addData(callback) {
     };
     tx.oncomplete = () => { callback?.(); displayData(); };
     tx.onerror = () => showToast("خطا در ذخیره یادداشت", "danger");
-  } catch (e) {
-    console.error("addData error:", e);
-    showToast("خطا در ذخیره یادداشت", "danger");
-  }
+  } catch (e) { showToast("خطا در ذخیره یادداشت", "danger"); }
 }
 
 function updateTask(id, updates, callback) {
@@ -429,7 +331,6 @@ function updateTask(id, updates, callback) {
     const tx = db.transaction(["To do"], "readwrite");
     const store = tx.objectStore("To do");
     const req = store.get(id);
-
     req.onsuccess = () => {
       const data = req.result;
       if (!data) return;
@@ -442,7 +343,7 @@ function updateTask(id, updates, callback) {
         displayData();
       };
     };
-  } catch (e) { console.error("updateTask error:", e); }
+  } catch (e) {}
 }
 
 function updateTaskStatus(id, completed) {
@@ -457,11 +358,8 @@ function deleteData(id) {
   try {
     const tx = db.transaction(["To do"], "readwrite");
     tx.objectStore("To do").delete(id);
-    tx.oncomplete = () => {
-      cancelNotifTimer(id);
-      displayData();
-    };
-  } catch (e) { console.error("deleteData error:", e); }
+    tx.oncomplete = () => { cancelNotifTimer(id); displayData(); };
+  } catch (e) {}
 }
 
 function getAllTasks() {
@@ -488,9 +386,6 @@ function getTaskById(id) {
   });
 }
 
-/* ============================================================
-   فیلتر
-   ============================================================ */
 function searchTasks(term) {
   currentSearchTerm = term.toLowerCase().trim();
   displayData();
@@ -514,9 +409,7 @@ function setFilter(filter) {
     }
     return;
   }
-
   activeFilter = filter;
-
   if (filter === "done") {
     showOnlyCompleted = true;
     if (switchCheckDefault) switchCheckDefault.checked = true;
@@ -524,7 +417,6 @@ function setFilter(filter) {
     showOnlyCompleted = false;
     if (switchCheckDefault) switchCheckDefault.checked = false;
   }
-
   updateActiveCard();
   displayData();
 }
@@ -535,26 +427,18 @@ function updateActiveCard() {
   });
 }
 
-/* ============================================================
-   رندر
-   ============================================================ */
 function displayData() {
   if (!db || !from) return;
-
   try {
     while (from.firstChild) from.removeChild(from.firstChild);
-
     const tx = db.transaction(["To do"], "readonly");
     const req = tx.objectStore("To do").index("createdAt").openCursor(null, "prev");
-
     let totalCount = 0;
     let totalDone = 0;
     let totalUrgent = 0;
     let visibleCount = 0;
-
     req.onsuccess = (e) => {
       const cursor = e.target.result;
-
       if (!cursor) {
         updateStats(totalCount, totalDone, totalUrgent);
         if (visibleCount === 0) {
@@ -566,7 +450,6 @@ function displayData() {
         updateCount(visibleCount, totalCount);
         return;
       }
-
       const value = cursor.value;
       const title = (value.Title || "").trim();
       const description = (value.Body || "").trim();
@@ -575,7 +458,6 @@ function displayData() {
       const taskId = value.id;
       const createdAt = value.createdAt ? new Date(value.createdAt) : new Date();
       const deadline = value.deadline ? new Date(value.deadline) : null;
-
       if (title !== "") {
         totalCount++;
         if (completed) totalDone++;
@@ -584,45 +466,33 @@ function displayData() {
           if (st === "urgent" || st === "overdue") totalUrgent++;
         }
       }
-
       if (title === "") { cursor.continue(); return; }
       if (showOnlyCompleted && !completed) { cursor.continue(); return; }
       if (activeFilter === "done" && !completed) { cursor.continue(); return; }
-
       if (activeFilter === "urgent") {
         if (completed) { cursor.continue(); return; }
         if (!deadline) { cursor.continue(); return; }
         const st = getDeadlineStatus(deadline);
         if (st !== "urgent" && st !== "overdue") { cursor.continue(); return; }
       }
-
       if (currentSearchTerm) {
         const tMatch = title.toLowerCase().includes(currentSearchTerm);
         const dMatch = description.toLowerCase().includes(currentSearchTerm);
         if (!tMatch && !dMatch) { cursor.continue(); return; }
       }
-
       visibleCount++;
-
       try {
-        from.appendChild(buildTaskElement({
-          taskId, title, description, price, completed, createdAt, deadline
-        }));
-      } catch (err) { console.error("buildTaskElement error:", err); }
-
+        from.appendChild(buildTaskElement({ taskId, title, description, price, completed, createdAt, deadline }));
+      } catch (err) {}
       cursor.continue();
     };
-  } catch (e) { console.error("displayData error:", e); }
+  } catch (e) {}
 }
 
-/* ============================================================
-   ساخت کارت یادداشت
-   ============================================================ */
 function buildTaskElement({ taskId, title, description, price, completed, createdAt, deadline }) {
   const task = document.createElement("div");
   task.className = "task";
   task.dataset.id = taskId;
-
   const deadlineStatus = deadline ? getDeadlineStatus(deadline) : null;
   if (completed) task.classList.add("task-completed");
   else if (deadlineStatus === "overdue") task.classList.add("priority-overdue");
@@ -630,7 +500,6 @@ function buildTaskElement({ taskId, title, description, price, completed, create
 
   const header = document.createElement("div");
   header.className = "task-header";
-
   const titleEl = document.createElement("div");
   titleEl.className = "task-title";
   if (currentSearchTerm && title.toLowerCase().includes(currentSearchTerm)) {
@@ -641,13 +510,11 @@ function buildTaskElement({ taskId, title, description, price, completed, create
     titleEl.textContent = title;
   }
   if (completed) titleEl.style.textDecoration = "line-through";
-
   header.appendChild(titleEl);
 
   if (deadline) {
     const badge = document.createElement("span");
     badge.className = "task-badge";
-
     if (completed) {
       badge.classList.add("badge-done");
       badge.innerHTML = `<i class="bi bi-check2"></i> انجام شد`;
@@ -683,11 +550,9 @@ function buildTaskElement({ taskId, title, description, price, completed, create
     descEl.style.opacity = "0.5";
     descEl.style.fontStyle = "italic";
   }
-
   task.appendChild(header);
   task.appendChild(descEl);
 
-  // 🆕 نمایش قیمت
   if (price && price > 0) {
     const priceEl = document.createElement("div");
     priceEl.className = "task-price";
@@ -713,7 +578,6 @@ function buildTaskElement({ taskId, title, description, price, completed, create
 
   const actions = document.createElement("div");
   actions.className = "task-actions";
-
   const doneToggle = document.createElement("label");
   doneToggle.className = "done-toggle";
   doneToggle.innerHTML = `
@@ -723,40 +587,32 @@ function buildTaskElement({ taskId, title, description, price, completed, create
       ${completed ? "انجام شده" : "انجام نشده"}
     </span>
   `;
-
   const checkbox = doneToggle.querySelector("input");
-  checkbox.addEventListener("change", () => {
-    updateTaskStatus(taskId, checkbox.checked);
-  });
+  checkbox.addEventListener("change", () => { updateTaskStatus(taskId, checkbox.checked); });
 
   const btnGroup = document.createElement("div");
   btnGroup.className = "btn-group-actions";
-
   const shareBtn = document.createElement("button");
   shareBtn.type = "button";
   shareBtn.className = "action-btn share";
   shareBtn.innerHTML = '<i class="bi bi-share-fill"></i>';
   shareBtn.title = "اشتراک‌گذاری فاکتور";
   shareBtn.addEventListener("click", () => openInvoicePreview(taskId));
-
   const editBtn = document.createElement("button");
   editBtn.type = "button";
   editBtn.className = "action-btn edit";
   editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
   editBtn.title = "ویرایش";
   editBtn.addEventListener("click", () => openEditForm(taskId));
-
   const delBtn = document.createElement("button");
   delBtn.type = "button";
   delBtn.className = "action-btn delete";
   delBtn.innerHTML = '<i class="bi bi-trash3"></i>';
   delBtn.title = "حذف";
   delBtn.addEventListener("click", () => openDeleteConfirm(taskId));
-
   btnGroup.appendChild(shareBtn);
   btnGroup.appendChild(editBtn);
   btnGroup.appendChild(delBtn);
-
   actions.appendChild(doneToggle);
   actions.appendChild(btnGroup);
   task.appendChild(actions);
@@ -764,9 +620,6 @@ function buildTaskElement({ taskId, title, description, price, completed, create
   return task;
 }
 
-/* ============================================================
-   فرم
-   ============================================================ */
 function openCreateForm() {
   resetForm();
   formTitle.textContent = "یادداشت جدید";
@@ -782,24 +635,19 @@ function openEditForm(id) {
   try {
     const tx = db.transaction(["To do"], "readonly");
     const req = tx.objectStore("To do").get(id);
-
     req.onsuccess = () => {
       const data = req.result;
       if (!data) return;
-
       editingTaskId = id;
       titleTaskinput.value = data.Title || "";
       titledisinput.value = data.Body || "";
-
       if (taskPriceInput) {
         if (data.Price && data.Price > 0) {
-          // برای نمایش در input، از فرمت en-US استفاده کن
           taskPriceInput.value = Number(data.Price).toLocaleString("en-US");
         } else {
           taskPriceInput.value = "";
         }
       }
-
       if (data.deadline) {
         selectedDeadline = new Date(data.deadline);
         taskDeadlineInput.value = dateToPersianInput(selectedDeadline);
@@ -807,15 +655,13 @@ function openEditForm(id) {
         selectedDeadline = null;
         taskDeadlineInput.value = "";
       }
-
       formTitle.textContent = "ویرایش یادداشت";
       submitText.textContent = "ذخیره";
       formIcon.className = "bi bi-pencil-square";
-
       display.classList.remove("dis-hide");
       adduserback.classList.remove("dis-hide");
     };
-  } catch (e) { console.error("openEditForm error:", e); }
+  } catch (e) {}
 }
 
 function resetForm() {
@@ -836,9 +682,6 @@ function closeForm() {
   resetForm();
 }
 
-/* ============================================================
-   حذف
-   ============================================================ */
 function openDeleteConfirm(taskId) {
   pendingDeleteId = taskId;
   ask.classList.remove("dis-hide");
@@ -859,34 +702,16 @@ function confirmDelete() {
   closeDeleteConfirm();
 }
 
-/* ============================================================
-   پیام‌های خالی
-   ============================================================ */
 function showNoResultsMessage() {
-  from.innerHTML = `
-    <div class="empty-state">
-      <h5>نتیجه‌ای یافت نشد</h5>
-      <p>هیچ یادداشتی با عبارت «${currentSearchTerm}» پیدا نشد</p>
-    </div>
-  `;
+  from.innerHTML = `<div class="empty-state"><h5>نتیجه‌ای یافت نشد</h5><p>هیچ یادداشتی با عبارت «${currentSearchTerm}» پیدا نشد</p></div>`;
 }
 
 function showNoCompletedTasksMessage() {
-  from.innerHTML = `
-    <div class="empty-state">
-      <h5>یادداشت انجام‌شده‌ای وجود ندارد</h5>
-      <p>هنوز هیچ یادداشتی را انجام نداده‌اید</p>
-    </div>
-  `;
+  from.innerHTML = `<div class="empty-state"><h5>یادداشت انجام‌شده‌ای وجود ندارد</h5><p>هنوز هیچ یادداشتی را انجام نداده‌اید</p></div>`;
 }
 
 function showNoUrgentTasksMessage() {
-  from.innerHTML = `
-    <div class="empty-state">
-      <h5>تسک فوری‌ای وجود ندارد</h5>
-      <p>هیچ یادداشتی با وضعیت فوری یا گذشته نیست</p>
-    </div>
-  `;
+  from.innerHTML = `<div class="empty-state"><h5>تسک فوری‌ای وجود ندارد</h5><p>هیچ یادداشتی با وضعیت فوری یا گذشته نیست</p></div>`;
 }
 
 function checkEmptyTasks() {
@@ -899,17 +724,11 @@ function checkEmptyTasks() {
     const msg = document.createElement("div");
     msg.id = "empty-msg";
     msg.className = "empty-state";
-    msg.innerHTML = `
-      <h5>هیچ یادداشتی نداری!</h5>
-      <p>برای شروع روی دکمه + پایین صفحه کلیک کن</p>
-    `;
+    msg.innerHTML = `<h5>هیچ یادداشتی نداری!</h5><p>برای شروع روی دکمه + پایین صفحه کلیک کن</p>`;
     from.appendChild(msg);
   }, 100);
 }
 
-/* ============================================================
-   شمارنده و آمار
-   ============================================================ */
 function updateCount(visibleCount, totalCount) {
   setTimeout(() => {
     const countEl = document.getElementById("count");
@@ -930,23 +749,14 @@ function updateStats(total, done, urgent) {
   if (elUrgent) elUrgent.textContent = urgent;
 }
 
-/* ============================================================
-   🧾 سیستم فاکتور و اشتراک‌گذاری
-   ============================================================ */
 async function openInvoicePreview(taskId) {
   const task = await getTaskById(taskId);
-  if (!task) {
-    showToast("تسک پیدا نشد", "danger");
-    return;
-  }
-
+  if (!task) { showToast("تسک پیدا نشد", "danger"); return; }
   currentInvoiceTaskId = taskId;
   currentInvoiceBlob = null;
-
   invoiceRenderArea.innerHTML = buildInvoiceHTML(task);
   invoicePreview.classList.remove("dis-hide");
   document.body.style.overflow = "hidden";
-
   setTimeout(() => generateInvoiceImage(), 300);
 }
 
@@ -968,11 +778,10 @@ function buildInvoiceHTML(task) {
 
   const ff = "'Vazirmatn','Vazir','IRANSans',Tahoma,Arial,sans-serif";
 
-  // helper برای ساخت یک ردیف
   const row = (label, value, bold) => `
     <div dir="rtl" style="display:flex;justify-content:space-between;align-items:center;font-family:${ff};font-size:12px;padding:5px 0;direction:rtl;letter-spacing:0;">
-      <span style="color:#64748b;font-weight:500;">${label}</span>
-      <span style="color:#1e293b;font-weight:${bold ? "800" : "700"};direction:rtl;white-space:nowrap;">${value}</span>
+      <span style="color:#64748b;font-weight:500;letter-spacing:0;">${label}</span>
+      <span style="color:#1e293b;font-weight:${bold ? "800" : "700"};direction:rtl;white-space:nowrap;letter-spacing:0;">${value}</span>
     </div>`;
 
   const rows = [];
@@ -986,24 +795,21 @@ function buildInvoiceHTML(task) {
 
   const totalHTML = price > 0 ? `
     <div dir="rtl" style="background:#ecfdf5;border:2px solid #10b981;border-radius:14px;padding:16px 18px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;font-family:${ff};direction:rtl;">
-      <span style="font-size:14px;font-weight:800;color:#065f46;letter-spacing:0;">🧾 جمع کل قابل پرداخت</span>
-      <span style="font-size:18px;font-weight:800;color:#059669;letter-spacing:0;white-space:nowrap;">${formatPrice(price)} تومان</span>
+      <span style="font-size:14px;font-weight:800;color:#065f46;letter-spacing:0;direction:rtl;">🧾 جمع کل قابل پرداخت</span>
+      <span style="font-size:18px;font-weight:800;color:#059669;letter-spacing:0;white-space:nowrap;direction:rtl;">${formatPrice(price)} <span style="font-size:11px;font-weight:500;opacity:0.85;">تومان</span></span>
     </div>` : "";
 
   return `
     <div class="invoice-card" id="invoiceCard" dir="rtl" lang="fa" style="width:100%;max-width:100%;background:#ffffff;color:#1e293b;font-family:${ff};border-radius:20px;overflow:hidden;direction:rtl;text-align:right;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
 
-      <!-- Header -->
       <div class="invoice-header" style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);color:#ffffff;padding:24px 22px;direction:rtl;position:relative;">
         <h1 class="invoice-store-name" dir="rtl" lang="fa" style="font-family:${ff};font-size:22px;font-weight:800;margin:0 0 8px 0;padding:0;color:#ffffff;line-height:1.7;letter-spacing:0;word-spacing:0;direction:rtl;text-align:right;white-space:nowrap;overflow:visible;">${STORE_NAME}</h1>
         <p dir="rtl" lang="fa" style="font-family:${ff};font-size:12px;color:#ffffff;opacity:0.9;margin:0 0 14px 0;line-height:1.5;direction:rtl;text-align:right;letter-spacing:0;">${STORE_TAGLINE}</p>
         <span dir="rtl" lang="fa" style="display:inline-block;background:rgba(255,255,255,0.22);color:#ffffff;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,0.4);font-family:${ff};letter-spacing:0;">✅ فاکتور رسمی</span>
       </div>
 
-      <!-- Divider -->
       <div style="height:4px;background:repeating-linear-gradient(90deg,#2563eb 0,#2563eb 10px,transparent 10px,transparent 20px,#10b981 20px,#10b981 30px,transparent 30px,transparent 40px);opacity:0.3;"></div>
 
-      <!-- Meta -->
       <div dir="rtl" style="padding:18px 22px;display:flex;justify-content:space-between;gap:12px;background:#f8fafc;border-bottom:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
         <div dir="rtl" style="display:flex;flex-direction:column;gap:4px;">
           <span style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:0;">شماره فاکتور</span>
@@ -1015,7 +821,6 @@ function buildInvoiceHTML(task) {
         </div>
       </div>
 
-      <!-- Body -->
       <div dir="rtl" style="padding:20px 22px;direction:rtl;">
         <h3 dir="rtl" lang="fa" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#1e40af;margin:0 0 12px 0;padding:0 0 8px 0;border-bottom:2px solid #e0e7ff;font-family:${ff};letter-spacing:0;direction:rtl;text-align:right;">
           📦 جزئیات سفارش
@@ -1032,11 +837,10 @@ function buildInvoiceHTML(task) {
         ${totalHTML}
       </div>
 
-      <!-- Footer -->
       <div dir="rtl" style="padding:16px 22px 20px;background:#f8fafc;text-align:center;border-top:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
         <p dir="rtl" lang="fa" style="font-size:14px;font-weight:800;color:#1e40af;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;">🙏 از خرید شما سپاسگزاریم</p>
         <p dir="rtl" lang="fa" style="font-size:11px;color:#64748b;margin:0;line-height:1.8;font-family:${ff};letter-spacing:0;">جهت سفارشات بیشتر و پیگیری با ما در تماس باشید</p>
-  
+      
       </div>
 
     </div>
@@ -1050,23 +854,14 @@ function escapeHtml(str) {
 }
 
 async function generateInvoiceImage() {
-  if (typeof html2canvas === "undefined") {
-    console.warn("html2canvas not loaded");
-    return null;
-  }
-
+  if (typeof html2canvas === "undefined") return null;
   const card = document.getElementById("invoiceCard");
   if (!card) return null;
-
   try {
-    // 👇 انتظار برای لود کامل فونت‌ها
     if (document.fonts && document.fonts.ready) {
-      try { await document.fonts.ready; } catch (e) { /* silent */ }
+      try { await document.fonts.ready; } catch (e) {}
     }
-
-    // تاخیر کوچیک برای رندر پایدار
-    await new Promise((r) => setTimeout(r, 200));
-
+    await new Promise((r) => setTimeout(r, 250));
     const canvas = await html2canvas(card, {
       scale: 2,
       backgroundColor: "#ffffff",
@@ -1079,60 +874,35 @@ async function generateInvoiceImage() {
       windowWidth: card.scrollWidth,
       windowHeight: card.scrollHeight,
     });
-
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         currentInvoiceBlob = blob;
-        console.log("✅ Invoice image ready:", blob?.size, "bytes");
         resolve(blob);
       }, "image/png", 1.0);
     });
-  } catch (err) {
-    console.error("html2canvas error:", err);
-    return null;
-  }
+  } catch (err) { return null; }
 }
 
 async function shareInvoice() {
-  if (!currentInvoiceTaskId) {
-    showToast("خطا: تسک انتخاب نشده", "danger");
-    return;
-  }
-
+  if (!currentInvoiceTaskId) { showToast("خطا: تسک انتخاب نشده", "danger"); return; }
   const task = await getTaskById(currentInvoiceTaskId);
-  if (!task) {
-    showToast("تسک پیدا نشد", "danger");
-    return;
-  }
-
+  if (!task) { showToast("تسک پیدا نشد", "danger"); return; }
   if (!currentInvoiceBlob) {
     showToast("در حال آماده‌سازی تصویر...", "info");
     await generateInvoiceImage();
   }
-
-  if (!currentInvoiceBlob) {
-    showToast("خطا در ساخت تصویر فاکتور", "danger");
-    return;
-  }
-
+  if (!currentInvoiceBlob) { showToast("خطا در ساخت تصویر فاکتور", "danger"); return; }
   const fileName = `invoice-${task.id}-${Date.now()}.png`;
   const file = new File([currentInvoiceBlob], fileName, { type: "image/png" });
-
   const shareText = `🧾 فاکتور از ${STORE_NAME}\n\n📦 ${task.Title}${
     task.Price ? `\n💰 مبلغ: ${formatPrice(task.Price)} تومان` : ""
   }\n\n🙏 از خرید شما سپاسگزاریم`;
-
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({
-        files: [file],
-        title: `فاکتور ${STORE_NAME}`,
-        text: shareText,
-      });
+      await navigator.share({ files: [file], title: `فاکتور ${STORE_NAME}`, text: shareText });
       showToast("✅ فاکتور اشتراک‌گذاری شد", "success");
     } catch (err) {
       if (err.name === "AbortError") return;
-      console.error("Share failed:", err);
       downloadInvoiceImage(fileName);
     }
   } else {
@@ -1153,42 +923,31 @@ function downloadInvoiceImage(fileName) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/* ============================================================
-   نوتیفیکیشن
-   ============================================================ */
 function scheduleDeadlineTimer(taskId, deadline, title) {
   cancelNotifTimer(taskId);
   const now = Date.now();
   const deadlineMs = deadline.getTime();
   const diff = deadlineMs - now;
-
   if (diff <= 0) {
     sendDeadlineNotification(taskId, title, true);
     startRepeatTimer(taskId, title);
     return;
   }
-
   const timer = setTimeout(() => {
     sendDeadlineNotification(taskId, title, false);
     startRepeatTimer(taskId, title);
   }, diff);
-
   notifTimers.set(taskId, timer);
 }
 
 function startRepeatTimer(taskId, title) {
   const existingKey = "repeat-" + taskId;
   if (notifTimers.has(existingKey)) clearInterval(notifTimers.get(existingKey));
-
   const repeatTimer = setInterval(async () => {
     const task = await getTaskById(taskId);
-    if (!task || task.completed) {
-      cancelNotifTimer(taskId);
-      return;
-    }
+    if (!task || task.completed) { cancelNotifTimer(taskId); return; }
     sendDeadlineNotification(taskId, title, true);
   }, 24 * 60 * 60 * 1000);
-
   notifTimers.set(existingKey, repeatTimer);
 }
 
@@ -1207,7 +966,6 @@ function cancelNotifTimer(taskId) {
 async function sendDeadlineNotification(taskId, title, isOverdue) {
   const notifTitle = isOverdue ? "🔴 موعد تسک رسید!" : "⏰ یادآوری تسک";
   const notifBody = `"${title}" هنوز انجام نشده`;
-
   if (swRegistration && "showNotification" in swRegistration) {
     try {
       await swRegistration.showNotification(notifTitle, {
@@ -1224,13 +982,10 @@ async function sendDeadlineNotification(taskId, title, isOverdue) {
           { action: "snooze", title: "⏰ ۲ ساعت بعد" },
         ],
       });
-    } catch (err) {
-      sendBasicNotification(notifTitle, notifBody, taskId);
-    }
+    } catch (err) { sendBasicNotification(notifTitle, notifBody, taskId); }
   } else {
     sendBasicNotification(notifTitle, notifBody, taskId);
   }
-
   updateTaskLastNotif(taskId, new Date().toISOString());
 }
 
@@ -1247,7 +1002,7 @@ function sendBasicNotification(title, body, taskId) {
       vibrate: [300, 100, 300, 100, 300],
     });
     notif.onclick = () => { window.focus(); notif.close(); };
-  } catch (e) { /* silent */ }
+  } catch (e) {}
 }
 
 function updateTaskLastNotif(taskId, isoString) {
@@ -1262,25 +1017,20 @@ function updateTaskLastNotif(taskId, isoString) {
       data.lastNotificationAt = isoString;
       store.put(data);
     };
-  } catch (e) { /* silent */ }
+  } catch (e) {}
 }
 
 async function checkMissedNotifications() {
   const tasks = await getAllTasks();
   const now = Date.now();
-
   for (const task of tasks) {
     if (task.completed || !task.deadline) continue;
     const deadline = new Date(task.deadline).getTime();
     if (deadline > now) continue;
-
     const lastNotif = task.lastNotificationAt ? new Date(task.lastNotificationAt).getTime() : 0;
     const hoursSinceLast = (now - lastNotif) / 3600000;
-
     if (lastNotif === 0 || hoursSinceLast >= 24) {
-      setTimeout(() => {
-        sendDeadlineNotification(task.id, task.Title, true);
-      }, 1500);
+      setTimeout(() => { sendDeadlineNotification(task.id, task.Title, true); }, 1500);
     }
   }
 }
@@ -1293,9 +1043,6 @@ async function scheduleAllDeadlineTimers() {
   }
 }
 
-/* ============================================================
-   رویدادها
-   ============================================================ */
 function bindEvents() {
   fabAdd?.addEventListener("click", openCreateForm);
   cancelForm?.addEventListener("click", closeForm);
@@ -1318,16 +1065,13 @@ function bindEvents() {
   create2?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-
     const title = titleTaskinput?.value.trim() || "";
     if (!title) {
       showToast("عنوان یادداشت را وارد کنید!", "warning");
       titleTaskinput?.focus();
       return;
     }
-
     const priceValue = parsePrice(taskPriceInput?.value || "");
-
     if (editingTaskId !== null) {
       updateTask(editingTaskId, {
         Title: title,
@@ -1346,38 +1090,24 @@ function bindEvents() {
     }
   });
 
-  // 🆕 فرمت زنده قیمت با حفظ کرسر
   if (taskPriceInput) {
-    taskPriceInput.addEventListener("input", function () {
-      formatPriceInputLive(this);
-    });
-
-    // فقط ارقام قبول کن
+    taskPriceInput.addEventListener("input", function () { formatPriceInputLive(this); });
     taskPriceInput.addEventListener("keypress", function (e) {
       const char = String.fromCharCode(e.which);
-      if (!/[\d۰-۹٠-٩]/.test(char)) {
-        e.preventDefault();
-      }
+      if (!/[\d۰-۹٠-٩]/.test(char)) e.preventDefault();
     });
-
-    // paste — ارقام فارسی/انگلیسی رو هندل کن
     taskPriceInput.addEventListener("paste", function (e) {
       e.preventDefault();
       const pasted = (e.clipboardData || window.clipboardData).getData("text");
       const digits = extractDigits(pasted);
       if (digits) {
         const num = parseInt(digits, 10);
-        if (!isNaN(num)) {
-          this.value = num.toLocaleString("en-US");
-        }
+        if (!isNaN(num)) this.value = num.toLocaleString("en-US");
       }
     });
   }
 
-  searchInput?.addEventListener("input", function () {
-    searchTasks(this.value);
-  });
-
+  searchInput?.addEventListener("input", function () { searchTasks(this.value); });
   searchInput?.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
       this.value = "";
@@ -1418,7 +1148,6 @@ function bindEvents() {
         enableNotifBtn.classList.add("active");
         const icon = enableNotifBtn.querySelector("i");
         if (icon) icon.className = "bi bi-bell-fill";
-
         setTimeout(() => {
           if (swRegistration) {
             swRegistration.showNotification("🎉 نوتیفیکیشن فعال شد", {
@@ -1429,13 +1158,12 @@ function bindEvents() {
             });
           }
         }, 1000);
-
         if (swRegistration && "periodicSync" in swRegistration) {
           try {
             await swRegistration.periodicSync.register("deadline-check", {
               minInterval: 24 * 60 * 60 * 1000,
             });
-          } catch (err) { /* silent */ }
+          } catch (err) {}
         }
       } else {
         showToast("اجازه نوتیفیکیشن داده نشد", "danger");
@@ -1454,9 +1182,6 @@ function bindEvents() {
   });
 }
 
-/* ============================================================
-   Toast
-   ============================================================ */
 function showToast(message, type = "info") {
   if (!toastContainer) return;
   const toast = document.createElement("div");
@@ -1476,9 +1201,6 @@ function showToast(message, type = "info") {
   }, 3500);
 }
 
-/* ============================================================
-   PDF (فاکتور کل)
-   ============================================================ */
 let _vazirFontCache = null;
 
 async function getVazirFont() {
@@ -1514,9 +1236,7 @@ async function generateInvoicePDF() {
       const dbb = new Date(b.createdAt || 0);
       return dbb - da;
     });
-
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
     let fontLoaded = false;
     try {
       const fontBase64 = await getVazirFont();
@@ -1524,16 +1244,13 @@ async function generateInvoicePDF() {
       doc.addFont("Vazirmatn-Regular.ttf", "Vazirmatn", "normal");
       doc.setFont("Vazirmatn");
       fontLoaded = true;
-    } catch (err) { /* silent */ }
-
+    } catch (err) {}
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 15;
     const contentW = pageW - margin * 2;
-
     doc.setFillColor(30, 64, 175);
     doc.rect(0, 0, pageW, 35, "F");
-
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     if (fontLoaded) doc.setFont("Vazirmatn", "normal");
@@ -1542,13 +1259,11 @@ async function generateInvoicePDF() {
     doc.text(STORE_TAGLINE, pageW - margin, 23, { align: "right" });
     doc.setFontSize(9);
     doc.text(`تاریخ: ${formatPersianDateTime(new Date())}`, pageW - margin, 31, { align: "right" });
-
     let y = 45;
     const total = allTasks.length;
     const doneCount = allTasks.filter((t) => t.completed).length;
     const pendingCount = total - doneCount;
     const totalPrice = allTasks.reduce((sum, t) => sum + (t.Price || 0), 0);
-
     const cardW = (contentW - 8) / 3;
     const cardH = 20;
     const cards = [
@@ -1556,7 +1271,6 @@ async function generateInvoicePDF() {
       { label: "انجام شده", value: doneCount, color: [22, 163, 74] },
       { label: "در انتظار", value: pendingCount, color: [245, 158, 11] },
     ];
-
     cards.forEach((card, i) => {
       const x = pageW - margin - (i + 1) * cardW - i * 4;
       doc.setFillColor(card.color[0], card.color[1], card.color[2]);
@@ -1567,9 +1281,7 @@ async function generateInvoicePDF() {
       doc.setFontSize(14);
       doc.text(String(card.value), x + cardW / 2, y + 16, { align: "center" });
     });
-
     y += cardH + 6;
-
     if (totalPrice > 0) {
       doc.setFillColor(236, 253, 245);
       doc.roundedRect(margin, y, contentW, 12, 3, 3, "F");
@@ -1578,24 +1290,19 @@ async function generateInvoicePDF() {
       doc.text(`جمع کل مبالغ: ${formatPrice(totalPrice)} تومان`, pageW - margin - 3, y + 8, { align: "right" });
       y += 16;
     }
-
     doc.setFillColor(30, 41, 59);
     doc.rect(margin, y, contentW, 9, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
-
     const colTitleX = pageW - margin - 3;
     const colPriceX = pageW - margin - contentW * 0.45;
     const colStatusX = pageW - margin - contentW * 0.75;
-
     doc.text("عنوان", colTitleX, y + 6, { align: "right" });
     doc.text("مبلغ", colPriceX, y + 6, { align: "center" });
     doc.text("وضعیت", colStatusX, y + 6, { align: "center" });
     y += 9;
-
     const rowH = 8;
     let rowIndex = 0;
-
     for (const task of allTasks) {
       if (y + rowH > pageH - 25) {
         doc.addPage();
@@ -1609,7 +1316,6 @@ async function generateInvoicePDF() {
         doc.text("وضعیت", colStatusX, y + 6, { align: "center" });
         y += 9;
       }
-
       if (rowIndex % 2 === 0) {
         doc.setFillColor(248, 250, 252);
         doc.rect(margin, y, contentW, rowH, "F");
@@ -1618,14 +1324,11 @@ async function generateInvoicePDF() {
       doc.line(margin, y + rowH, pageW - margin, y + rowH);
       doc.setTextColor(30, 41, 59);
       doc.setFontSize(8);
-
       let titleTxt = (task.Title || "بدون عنوان").trim();
       if (titleTxt.length > 25) titleTxt = titleTxt.substring(0, 23) + "…";
       doc.text(titleTxt, colTitleX, y + 5.5, { align: "right" });
-
       const priceTxt = task.Price ? formatPrice(task.Price) : "—";
       doc.text(priceTxt, colPriceX, y + 5.5, { align: "center" });
-
       if (task.completed) {
         doc.setTextColor(22, 163, 74);
         doc.text("انجام شده", colStatusX, y + 5.5, { align: "center" });
@@ -1633,11 +1336,9 @@ async function generateInvoicePDF() {
         doc.setTextColor(100, 116, 139);
         doc.text("در انتظار", colStatusX, y + 5.5, { align: "center" });
       }
-
       y += rowH;
       rowIndex++;
     }
-
     const totalPages = doc.internal.getNumberOfPages();
     for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
@@ -1648,19 +1349,14 @@ async function generateInvoicePDF() {
       doc.text("یادداشت‌یار — فاکتور خودکار", margin, pageH - 9, { align: "left" });
       doc.text(`صفحه ${p} از ${totalPages}`, pageW - margin, pageH - 9, { align: "right" });
     }
-
     const fileName = `invoice-${new Date().toISOString().slice(0, 10)}.pdf`;
     doc.save(fileName);
     showToast("فاکتور PDF دانلود شد ✅", "success");
   } catch (err) {
-    console.error("PDF error:", err);
     showToast("خطا در ساخت فاکتور", "danger");
   }
 }
 
-/* ============================================================
-   PWA Install
-   ============================================================ */
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
@@ -1671,9 +1367,6 @@ window.addEventListener("appinstalled", () => {
   deferredPrompt = null;
 });
 
-/* ============================================================
-   Scroll
-   ============================================================ */
 function initHeaderScroll() {
   const appHeader = document.getElementById("appHeader");
   if (!appHeader) return;
@@ -1690,15 +1383,11 @@ function initHeaderScroll() {
   }, { passive: true });
 }
 
-/* ============================================================
-   Init
-   ============================================================ */
 function init() {
-  console.log("🚀 init() called");
-  try { bindEvents(); } catch (e) { console.error("bindEvents failed:", e); }
-  try { registerSW(); } catch (e) { console.error("SW failed:", e); }
-  try { openDatabase(); } catch (e) { console.error("openDatabase failed:", e); hideLoader(); }
-  try { initHeaderScroll(); } catch (e) { console.error("header scroll failed:", e); }
+  try { bindEvents(); } catch (e) {}
+  try { registerSW(); } catch (e) {}
+  try { openDatabase(); } catch (e) { hideLoader(); }
+  try { initHeaderScroll(); } catch (e) {}
   updateCount(0, 0);
   checkEmptyTasks();
 }
