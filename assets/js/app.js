@@ -964,99 +964,85 @@ function buildInvoiceHTML(task) {
   const price = task.Price || 0;
   const createdAt = task.createdAt ? new Date(task.createdAt) : new Date();
   const deadline = task.deadline ? new Date(task.deadline) : null;
-
   const invoiceNo = "INV-" + String(task.id).padStart(6, "0");
 
-  const itemRows = [];
+  const ff = "'Vazirmatn','Vazir','IRANSans',Tahoma,Arial,sans-serif";
 
-  itemRows.push(`
-    <div class="invoice-item-row">
-      <span class="row-label"><i class="bi bi-calendar-plus"></i> تاریخ ثبت</span>
-      <span class="row-value">${formatPersianDate(createdAt)} - ${formatPersianTime(createdAt)}</span>
-    </div>
-  `);
+  // helper برای ساخت یک ردیف
+  const row = (label, value, bold) => `
+    <div dir="rtl" style="display:flex;justify-content:space-between;align-items:center;font-family:${ff};font-size:12px;padding:5px 0;direction:rtl;letter-spacing:0;">
+      <span style="color:#64748b;font-weight:500;">${label}</span>
+      <span style="color:#1e293b;font-weight:${bold ? "800" : "700"};direction:rtl;white-space:nowrap;">${value}</span>
+    </div>`;
 
+  const rows = [];
+  rows.push(row("📅 تاریخ ثبت", `${formatPersianDate(createdAt)} - ${formatPersianTime(createdAt)}`));
   if (deadline) {
-    itemRows.push(`
-      <div class="invoice-item-row">
-        <span class="row-label"><i class="bi bi-alarm"></i> تاریخ تحویل</span>
-        <span class="row-value">${formatPersianDate(deadline)} - ${formatPersianTime(deadline)}</span>
-      </div>
-    `);
+    rows.push(row("⏰ تاریخ تحویل", `${formatPersianDate(deadline)} - ${formatPersianTime(deadline)}`));
   }
-
   if (price > 0) {
-    itemRows.push(`
-      <div class="invoice-item-row">
-        <span class="row-label"><i class="bi bi-cash-coin"></i> مبلغ</span>
-        <span class="row-value">${formatPrice(price)} تومان</span>
-      </div>
-    `);
+    rows.push(row("💰 مبلغ", `${formatPrice(price)} تومان`, true));
   }
 
-  const totalSection = price > 0 ? `
-    <div class="invoice-total">
-      <div class="invoice-total-label">
-        <i class="bi bi-receipt-cutoff"></i>
-        <span>جمع کل قابل پرداخت</span>
-      </div>
-      <div class="invoice-total-value">
-        ${formatPrice(price)}
-        <span class="unit">تومان</span>
-      </div>
-    </div>
-  ` : "";
+  const totalHTML = price > 0 ? `
+    <div dir="rtl" style="background:#ecfdf5;border:2px solid #10b981;border-radius:14px;padding:16px 18px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;font-family:${ff};direction:rtl;">
+      <span style="font-size:14px;font-weight:800;color:#065f46;letter-spacing:0;">🧾 جمع کل قابل پرداخت</span>
+      <span style="font-size:18px;font-weight:800;color:#059669;letter-spacing:0;white-space:nowrap;">${formatPrice(price)} تومان</span>
+    </div>` : "";
 
   return `
-    <div class="invoice-card" id="invoiceCard" dir="rtl">
-      <div class="invoice-header">
-        <h1 class="invoice-store-name" dir="rtl" lang="fa">${STORE_NAME}</h1>
-        <p class="invoice-store-sub" dir="rtl" lang="fa">${STORE_TAGLINE}</p>
-        <span class="invoice-badge" dir="rtl" lang="fa">
-          <i class="bi bi-patch-check-fill"></i> فاکتور رسمی
-        </span>
+    <div class="invoice-card" id="invoiceCard" dir="rtl" lang="fa" style="width:100%;max-width:100%;background:#ffffff;color:#1e293b;font-family:${ff};border-radius:20px;overflow:hidden;direction:rtl;text-align:right;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+
+      <!-- Header -->
+      <div class="invoice-header" style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);color:#ffffff;padding:24px 22px;direction:rtl;position:relative;">
+        <h1 class="invoice-store-name" dir="rtl" lang="fa" style="font-family:${ff};font-size:22px;font-weight:800;margin:0 0 8px 0;padding:0;color:#ffffff;line-height:1.7;letter-spacing:0;word-spacing:0;direction:rtl;text-align:right;white-space:nowrap;overflow:visible;">${STORE_NAME}</h1>
+        <p dir="rtl" lang="fa" style="font-family:${ff};font-size:12px;color:#ffffff;opacity:0.9;margin:0 0 14px 0;line-height:1.5;direction:rtl;text-align:right;letter-spacing:0;">${STORE_TAGLINE}</p>
+        <span dir="rtl" lang="fa" style="display:inline-block;background:rgba(255,255,255,0.22);color:#ffffff;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,0.4);font-family:${ff};letter-spacing:0;">✅ فاکتور رسمی</span>
       </div>
 
-      <div class="invoice-divider"></div>
+      <!-- Divider -->
+      <div style="height:4px;background:repeating-linear-gradient(90deg,#2563eb 0,#2563eb 10px,transparent 10px,transparent 20px,#10b981 20px,#10b981 30px,transparent 30px,transparent 40px);opacity:0.3;"></div>
 
-      <div class="invoice-meta">
-        <div class="invoice-meta-item" dir="rtl">
-          <span class="label">شماره فاکتور</span>
-          <span class="value">${invoiceNo}</span>
+      <!-- Meta -->
+      <div dir="rtl" style="padding:18px 22px;display:flex;justify-content:space-between;gap:12px;background:#f8fafc;border-bottom:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
+        <div dir="rtl" style="display:flex;flex-direction:column;gap:4px;">
+          <span style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:0;">شماره فاکتور</span>
+          <span style="font-size:13px;color:#1e293b;font-weight:700;letter-spacing:0;direction:ltr;">${invoiceNo}</span>
         </div>
-        <div class="invoice-meta-item" dir="rtl">
-          <span class="label">تاریخ صدور</span>
-          <span class="value">${formatPersianDate(new Date())}</span>
+        <div dir="rtl" style="display:flex;flex-direction:column;gap:4px;">
+          <span style="font-size:10px;color:#64748b;font-weight:600;letter-spacing:0;">تاریخ صدور</span>
+          <span style="font-size:13px;color:#1e293b;font-weight:700;letter-spacing:0;">${formatPersianDate(new Date())}</span>
         </div>
       </div>
 
-      <div class="invoice-body">
-        <h3 class="invoice-section-title" dir="rtl">
-          <i class="bi bi-box-seam-fill"></i>
-          <span>جزئیات سفارش</span>
+      <!-- Body -->
+      <div dir="rtl" style="padding:20px 22px;direction:rtl;">
+        <h3 dir="rtl" lang="fa" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#1e40af;margin:0 0 12px 0;padding:0 0 8px 0;border-bottom:2px solid #e0e7ff;font-family:${ff};letter-spacing:0;direction:rtl;text-align:right;">
+          📦 جزئیات سفارش
         </h3>
 
-        <div class="invoice-item" dir="rtl">
-          <h4 class="invoice-item-title" dir="rtl" lang="fa">${title}</h4>
-          ${description ? `<p class="invoice-item-desc" dir="rtl" lang="fa">${description}</p>` : ""}
-          <div class="invoice-item-rows">
-            ${itemRows.join("")}
+        <div dir="rtl" style="background:#f8fafc;border-radius:12px;padding:14px 16px;border-right:4px solid #2563eb;font-family:${ff};direction:rtl;">
+          <h4 dir="rtl" lang="fa" style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;line-height:1.7;direction:rtl;text-align:right;word-break:keep-all;">${title}</h4>
+          ${description ? `<p dir="rtl" lang="fa" style="font-size:12px;color:#64748b;margin:0 0 10px 0;line-height:1.7;font-family:${ff};letter-spacing:0;direction:rtl;text-align:right;">${description}</p>` : ""}
+          <div dir="rtl" style="display:flex;flex-direction:column;gap:2px;direction:rtl;">
+            ${rows.join("")}
           </div>
         </div>
 
-        ${totalSection}
+        ${totalHTML}
       </div>
 
-      <div class="invoice-footer" dir="rtl">
-        <p class="thanks" dir="rtl" lang="fa">🙏 از خرید شما سپاسگزاریم</p>
-        <p class="contact" dir="rtl" lang="fa">
-          جهت سفارشات بیشتر و پیگیری با ما در تماس باشید
-        </p>
-        <p class="watermark" dir="rtl" lang="fa">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
+      <!-- Footer -->
+      <div dir="rtl" style="padding:16px 22px 20px;background:#f8fafc;text-align:center;border-top:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
+        <p dir="rtl" lang="fa" style="font-size:14px;font-weight:800;color:#1e40af;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;">🙏 از خرید شما سپاسگزاریم</p>
+        <p dir="rtl" lang="fa" style="font-size:11px;color:#64748b;margin:0;line-height:1.8;font-family:${ff};letter-spacing:0;">جهت سفارشات بیشتر و پیگیری با ما در تماس باشید</p>
+        <p dir="rtl" lang="fa" style="font-size:9px;color:#94a3b8;margin:10px 0 0 0;font-family:${ff};letter-spacing:0;">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
       </div>
+
     </div>
   `;
 }
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -1073,10 +1059,13 @@ async function generateInvoiceImage() {
   if (!card) return null;
 
   try {
-    // 👇 مطمئن شو فونت لود شده
+    // 👇 انتظار برای لود کامل فونت‌ها
     if (document.fonts && document.fonts.ready) {
-      await document.fonts.ready;
+      try { await document.fonts.ready; } catch (e) { /* silent */ }
     }
+
+    // تاخیر کوچیک برای رندر پایدار
+    await new Promise((r) => setTimeout(r, 200));
 
     const canvas = await html2canvas(card, {
       scale: 2,
@@ -1084,42 +1073,11 @@ async function generateInvoiceImage() {
       useCORS: true,
       allowTaint: false,
       logging: false,
+      imageTimeout: 15000,
+      width: card.scrollWidth,
+      height: card.scrollHeight,
       windowWidth: card.scrollWidth,
       windowHeight: card.scrollHeight,
-      // 👇 مهم: قبل از رندر، استایل‌های اصلاحی رو تو کپی اعمال کن
-      onclone: function (clonedDoc) {
-        const clonedCard = clonedDoc.getElementById("invoiceCard");
-        if (!clonedCard) return;
-
-        // 👇 اعمال استایل مستقیم روی همه المان‌های متنی
-        const allElements = clonedCard.querySelectorAll("*");
-        allElements.forEach((el) => {
-          // جلوگیری از letter-spacing منفی
-          el.style.letterSpacing = "0px";
-          el.style.wordSpacing = "normal";
-
-          // برای عناصر متنی، RTL صریح
-          if (el.children.length === 0 && el.textContent.trim()) {
-            el.style.direction = "rtl";
-            el.style.unicodeBidi = "embed";
-            el.style.textAlign = el.style.textAlign || "right";
-          }
-        });
-
-        // 👇 مخصوص عنوان فروشگاه
-        const storeName = clonedCard.querySelector(".invoice-store-name");
-        if (storeName) {
-          storeName.style.fontFamily = "Vazirmatn, Vazir, Tahoma, sans-serif";
-          storeName.style.fontWeight = "800";
-          storeName.style.letterSpacing = "0px";
-          storeName.style.wordSpacing = "0px";
-          storeName.style.direction = "rtl";
-          storeName.style.textAlign = "right";
-          storeName.style.unicodeBidi = "embed";
-          storeName.style.whiteSpace = "nowrap";
-          storeName.style.lineHeight = "1.6";
-        }
-      },
     });
 
     return new Promise((resolve) => {
