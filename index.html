@@ -2,15 +2,16 @@
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>مدیریت کارها</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="format-detection" content="telephone=no">
+    <title>یادداشت‌یار — مدیریت یادداشت‌ها و کارها</title>
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="مدیریت کارها">
+    <meta name="apple-mobile-web-app-title" content="یادداشت‌یار">
     <link rel="apple-touch-icon" href="assets/img/maskable-512.png">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/img/maskable-512.png">
     <link rel="icon" type="image/png" sizes="512x512" href="assets/img/maskable-512.png">
@@ -33,7 +34,9 @@
     <style>
       .dis-hide { display: none !important; }
 
-      /* ============ تم روشن: آبی/سفید/سبز/قرمز ============ */
+      /* ============================================================
+         متغیرهای تم
+         ============================================================ */
       :root {
         --primary: #2563eb;
         --primary-dark: #1d4ed8;
@@ -46,7 +49,7 @@
         --info: #0891b2;
 
         --bg-gradient: linear-gradient(135deg, #eff6ff 0%, #f8fafc 50%, #f0fdf4 100%);
-        --card-bg: rgba(255, 255, 255, 0.9);
+        --card-bg: rgba(255, 255, 255, 0.92);
         --card-border: rgba(37, 99, 235, 0.1);
         --text-primary: #0f172a;
         --text-secondary: #64748b;
@@ -58,7 +61,6 @@
         --input-bg: rgba(255, 255, 255, 0.9);
       }
 
-      /* ============ تم تاریک: آبی/خاکستری ============ */
       body.dark-background {
         --primary: #3b82f6;
         --primary-dark: #2563eb;
@@ -71,7 +73,7 @@
         --info: #22d3ee;
 
         --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1e3a5f 100%);
-        --card-bg: rgba(30, 41, 59, 0.85);
+        --card-bg: rgba(30, 41, 59, 0.88);
         --card-border: rgba(59, 130, 246, 0.15);
         --text-primary: #f1f5f9;
         --text-secondary: #cbd5e1;
@@ -83,20 +85,44 @@
         --input-bg: rgba(15, 23, 42, 0.7);
       }
 
-      * { font-family: 'Vazirmatn', sans-serif !important; box-sizing: border-box; }
+      /* ============================================================
+         Reset و پایه
+         ============================================================ */
+      * {
+        font-family: 'Vazirmatn', sans-serif !important;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
 
-      html, body { margin: 0; padding: 0; min-height: 100%; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        overflow-x: hidden;
+      }
+
+      html { -webkit-text-size-adjust: 100%; }
 
       body {
         background: var(--bg-gradient);
         background-attachment: fixed;
         min-height: 100vh;
+        min-height: 100dvh;
         color: var(--text-primary);
         transition: background 0.4s ease, color 0.3s ease;
-        padding-bottom: 140px;
+        padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+        overscroll-behavior-y: none;
       }
 
-      /* ============ Loader ============ */
+      button, input, textarea {
+        font-family: inherit !important;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      /* ============================================================
+         Loader
+         ============================================================ */
       #lode {
         position: fixed;
         inset: 0;
@@ -117,46 +143,63 @@
         animation: spin 0.9s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
-      #lode p { margin-top: 20px; color: var(--text-secondary); font-weight: 500; font-size: 15px; }
+      #lode p {
+        margin-top: 20px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 15px;
+      }
 
-      /* ============ Header - STICKY ============ */
+      /* ============================================================
+         Container
+         ============================================================ */
+      .app-container {
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 12px 12px 0;
+      }
+
+      /* ============================================================
+         Header - Sticky
+         ============================================================ */
       .app-header {
         position: sticky;
-        top: 8px;
+        top: max(8px, env(safe-area-inset-top, 0px));
         z-index: 900;
 
         background: var(--card-bg);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
         border: 1px solid var(--card-border);
         border-radius: 20px;
-        padding: 12px 16px;
-        margin-bottom: 16px;
+        padding: 12px;
+        margin-bottom: 14px;
         box-shadow: var(--shadow-md);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-
-        transition: box-shadow 0.3s ease, background 0.3s ease, padding 0.3s ease;
+        transition: box-shadow 0.3s ease, background 0.3s ease;
       }
 
       .app-header.scrolled {
         box-shadow: var(--shadow-lg);
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
+      }
+
+      /* ردیف اول: لوگو + جستجو */
+      .header-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
       }
 
       .brand-logo {
-        width: 42px; height: 42px; min-width: 42px;
+        width: 44px; height: 44px; min-width: 44px;
         border-radius: 14px;
         overflow: hidden;
         background: linear-gradient(135deg, var(--primary), var(--primary-dark));
         display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
-        transition: transform 0.3s ease;
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        flex-shrink: 0;
       }
-      .brand-logo:hover { transform: rotate(-10deg) scale(1.05); }
       .brand-logo img {
         width: 100%;
         height: 100%;
@@ -164,21 +207,29 @@
         display: block;
       }
 
-      /* ============ Search ============ */
-      .search-wrap { position: relative; flex: 1; min-width: 150px; }
+      .search-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+      }
       .search-wrap > i {
-        position: absolute; right: 14px; top: 50%;
+        position: absolute;
+        right: 14px;
+        top: 50%;
         transform: translateY(-50%);
-        color: var(--text-muted); pointer-events: none;
-        font-size: 15px; z-index: 2;
+        color: var(--text-muted);
+        pointer-events: none;
+        font-size: 16px;
+        z-index: 2;
       }
       .search-input {
         width: 100%;
-        padding: 10px 40px 10px 14px;
+        height: 44px;
+        padding: 0 42px 0 14px;
         border-radius: 14px;
         border: 1px solid var(--border-color);
         background: var(--input-bg);
-        font-size: 14px;
+        font-size: 16px; /* ⚠️ iOS: زیر ۱۶px = زوم خودکار */
         transition: all 0.25s ease;
         outline: none;
         color: var(--text-primary);
@@ -189,125 +240,154 @@
         box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
       }
 
-      /* ============ Icon buttons ============ */
-      .icon-btn {
-        width: 42px; height: 42px; min-width: 42px;
-        border-radius: 14px;
+      /* ردیف دوم: دکمه‌های اقدام */
+      .header-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .action-chip {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 42px;
+        min-height: 42px;
+        border-radius: 12px;
         border: 1px solid var(--border-color);
         background: var(--input-bg);
         color: var(--text-secondary);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 17px; cursor: pointer;
-        transition: all 0.25s ease;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+        padding: 0 10px;
       }
-      .icon-btn:hover {
+      .action-chip:active { transform: scale(0.96); }
+      .action-chip i { font-size: 15px; }
+      .action-chip:hover {
         border-color: var(--primary);
         color: var(--primary);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-sm);
       }
-      .icon-btn.active {
+      .action-chip.active {
         background: linear-gradient(135deg, var(--success), var(--success-dark));
-        color: #fff; border-color: transparent;
+        color: #fff;
+        border-color: transparent;
       }
 
-      /* ============ Stats ============ */
+      /* ============================================================
+         Stats
+         ============================================================ */
       .stats-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-bottom: 16px;
+        gap: 8px;
+        margin-bottom: 14px;
       }
       .stat-card {
         background: var(--card-bg);
         backdrop-filter: blur(20px);
         border: 1px solid var(--card-border);
-        border-radius: 18px;
-        padding: 14px 10px;
+        border-radius: 16px;
+        padding: 12px 8px;
         text-align: center;
-        position: relative;
-        overflow: hidden;
         transition: all 0.3s ease;
         box-shadow: var(--shadow-sm);
       }
-      .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: var(--shadow-md);
-      }
+      .stat-card:active { transform: scale(0.97); }
+
       .stat-icon {
-        width: 34px; height: 34px;
-        border-radius: 12px;
+        width: 32px; height: 32px;
+        border-radius: 10px;
         display: inline-flex; align-items: center; justify-content: center;
-        font-size: 15px; margin-bottom: 6px;
+        font-size: 14px; margin-bottom: 4px;
       }
       .stat-total .stat-icon { background: rgba(37, 99, 235, 0.15); color: var(--primary); }
       .stat-done .stat-icon { background: rgba(22, 163, 74, 0.15); color: var(--success); }
       .stat-urgent .stat-icon { background: rgba(220, 38, 38, 0.15); color: var(--danger); }
+
       .stat-value {
-        font-size: 20px; font-weight: 700;
+        font-size: 18px; font-weight: 700;
         line-height: 1.2; color: var(--text-primary);
       }
       .stat-label {
-        font-size: 11px; color: var(--text-muted);
+        font-size: 10px; color: var(--text-muted);
         margin-top: 2px;
       }
 
-      /* ============ Task card ============ */
+      /* ============================================================
+         Task card
+         ============================================================ */
       .task {
         background: var(--card-bg);
         backdrop-filter: blur(20px);
         border: 1px solid var(--card-border);
-        border-radius: 18px;
-        padding: 16px;
-        margin-bottom: 12px;
+        border-radius: 16px;
+        padding: 14px;
+        margin-bottom: 10px;
         transition: all 0.3s ease;
         box-shadow: var(--shadow-sm);
         position: relative;
         overflow: hidden;
-      }
-      .task:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
+        word-break: break-word;
       }
       .task::before {
         content: '';
         position: absolute; top: 0; right: 0; bottom: 0;
         width: 4px; background: var(--primary);
-        border-radius: 0 18px 18px 0;
+        border-radius: 0 16px 16px 0;
       }
       .task.priority-urgent::before { background: var(--warning); }
       .task.priority-overdue::before { background: var(--danger); }
       .task.task-completed::before { background: var(--success); }
-      .task.task-completed { opacity: 0.75; }
+      .task.task-completed { opacity: 0.72; }
+
+      .task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
 
       .task-title {
-        font-size: 16px; font-weight: 700;
-        margin-bottom: 6px; word-break: break-word;
+        font-size: 15px; font-weight: 700;
         color: var(--text-primary);
+        line-height: 1.5;
+        flex: 1;
+        min-width: 0;
+        word-break: break-word;
       }
+
       .task-desc {
         font-size: 13px;
         color: var(--text-secondary);
-        margin-bottom: 12px;
-        line-height: 1.6; word-break: break-word;
+        margin-bottom: 10px;
+        line-height: 1.7;
+        word-break: break-word;
       }
+
       .task-meta {
-        font-size: 12px;
+        font-size: 11px;
         color: var(--text-muted);
-        padding-top: 10px;
+        padding-top: 8px;
         border-top: 1px solid var(--border-color);
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
       .task-meta .meta-row {
         display: flex; align-items: center; gap: 6px;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
+        line-height: 1.5;
       }
 
       .task-badge {
-        font-size: 11px; font-weight: 600;
-        padding: 5px 10px; border-radius: 10px;
-        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 10px; font-weight: 600;
+        padding: 4px 8px; border-radius: 8px;
+        display: inline-flex; align-items: center; gap: 3px;
         white-space: nowrap; flex-shrink: 0;
+        line-height: 1.4;
       }
       .badge-normal { background: rgba(100, 116, 139, 0.15); color: var(--text-secondary); }
       .badge-soon { background: rgba(8, 145, 178, 0.15); color: var(--info); }
@@ -316,29 +396,37 @@
       .badge-done { background: rgba(22, 163, 74, 0.15); color: var(--success); }
 
       .task-actions {
-        display: flex; justify-content: space-between; align-items: center;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         padding-top: 10px;
         border-top: 1px solid var(--border-color);
-        gap: 8px; flex-wrap: wrap;
+        gap: 8px;
       }
 
       .done-toggle {
-        display: flex; align-items: center; gap: 8px;
-        cursor: pointer; user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
         padding: 6px 10px;
         border-radius: 10px;
         transition: background 0.2s ease;
         font-size: 13px;
+        min-height: 40px;
+        flex: 1;
       }
-      .done-toggle:hover { background: rgba(37, 99, 235, 0.08); }
+      .done-toggle:active { background: rgba(37, 99, 235, 0.08); }
       .done-toggle input { display: none; }
       .done-toggle .check-icon {
-        width: 22px; height: 22px;
+        width: 24px; height: 24px;
         border-radius: 50%;
         border: 2px solid var(--text-muted);
         display: flex; align-items: center; justify-content: center;
         transition: all 0.25s ease;
         font-size: 12px; color: transparent;
+        flex-shrink: 0;
       }
       .done-toggle input:checked + .check-icon {
         background: var(--success);
@@ -346,54 +434,62 @@
         color: #fff;
       }
 
+      .btn-group-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
       .action-btn {
-        width: 34px; height: 34px;
+        width: 40px; height: 40px;
         border-radius: 10px;
         border: 1px solid var(--border-color);
         background: transparent;
         display: inline-flex; align-items: center; justify-content: center;
-        font-size: 14px; cursor: pointer;
-        transition: all 0.25s ease;
+        font-size: 15px; cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
       }
       .action-btn.edit { color: var(--primary); }
-      .action-btn.edit:hover {
+      .action-btn.edit:active {
         background: var(--primary);
         color: #fff;
         border-color: var(--primary);
-        transform: translateY(-2px);
       }
       .action-btn.delete { color: var(--danger); }
-      .action-btn.delete:hover {
+      .action-btn.delete:active {
         background: var(--danger);
         color: #fff;
         border-color: var(--danger);
-        transform: translateY(-2px);
       }
 
-      /* ============ Floating Action Button ============ */
+      /* ============================================================
+         Floating Action Button
+         ============================================================ */
       .fab {
         position: fixed;
-        bottom: 90px;
-        left: 24px;
-        width: 60px; height: 60px;
+        bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+        left: 16px;
+        width: 56px; height: 56px;
         border-radius: 50%;
         background: linear-gradient(135deg, var(--primary), var(--primary-dark));
         color: #fff;
         border: none;
         display: flex; align-items: center; justify-content: center;
-        font-size: 28px;
+        font-size: 26px;
         cursor: pointer;
         box-shadow: 0 8px 24px rgba(37, 99, 235, 0.5);
         transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         z-index: 500;
+        -webkit-tap-highlight-color: transparent;
       }
-      .fab:hover {
-        transform: scale(1.1) rotate(90deg);
-        box-shadow: 0 12px 32px rgba(37, 99, 235, 0.6);
+      .fab:active {
+        transform: scale(0.9);
       }
-      .fab:active { transform: scale(0.95); }
 
-      /* ============ Blur layer ============ */
+      /* ============================================================
+         Blur layer
+         ============================================================ */
       .blur-layer {
         position: fixed; inset: 0;
         background: rgba(15, 23, 42, 0.5);
@@ -402,31 +498,44 @@
         z-index: 1000;
       }
 
-      /* ============ Modal / Form ============ */
+      /* ============================================================
+         Modal / Form - Mobile optimized
+         ============================================================ */
       .form-modal {
-        position: fixed; top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        width: 92%; max-width: 500px;
-        max-height: 90vh; overflow-y: auto;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        margin: auto;
+        width: calc(100% - 24px);
+        max-width: 500px;
+        height: fit-content;
+        max-height: calc(100dvh - 32px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+
         background: var(--card-bg);
         backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
         border: 1px solid var(--card-border);
         border-radius: 24px;
-        padding: 26px;
+        padding: 22px 20px;
         z-index: 1001;
         box-shadow: var(--shadow-lg);
         animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       }
 
       @keyframes modalIn {
-        from { opacity: 0; transform: translate(-50%, -46%) scale(0.96); }
-        to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
       }
 
       .form-modal h5 {
-        font-size: 18px; font-weight: 700;
-        margin-bottom: 20px;
-        display: flex; align-items: center; gap: 10px;
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         color: var(--text-primary);
       }
       .form-modal h5 i {
@@ -437,44 +546,74 @@
         display: inline-flex; align-items: center; justify-content: center;
         font-size: 16px;
       }
+
       .form-modal .form-label {
-        font-size: 13px; font-weight: 600;
+        font-size: 13px;
+        font-weight: 600;
         color: var(--text-secondary);
         margin-bottom: 6px;
         display: block;
       }
-      .form-modal .form-control {
+
+      .form-modal .form-control,
+      .form-modal textarea {
         width: 100%;
         border-radius: 12px;
         border: 1px solid var(--border-color);
-        padding: 10px 14px;
-        font-size: 14px;
+        padding: 12px 14px;
+        font-size: 16px; /* ⚠️ iOS no-zoom */
         background: var(--input-bg);
         transition: all 0.25s ease;
         outline: none;
         color: var(--text-primary);
+        min-height: 46px;
+      }
+      .form-modal textarea {
+        min-height: 90px;
+        resize: vertical;
+        line-height: 1.6;
       }
       .form-modal .form-control::placeholder { color: var(--text-muted); }
-      .form-modal .form-control:focus {
+      .form-modal .form-control:focus,
+      .form-modal textarea:focus {
         border-color: var(--primary);
         box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
       }
 
-      /* ============ Buttons ============ */
+      .form-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .form-actions button {
+        min-height: 46px;
+        flex: 1;
+        font-size: 14px;
+      }
+
+      /* ============================================================
+         Buttons
+         ============================================================ */
       .btn-primary-gradient {
         background: linear-gradient(135deg, var(--primary), var(--primary-dark));
         border: none; color: #fff;
         border-radius: 12px;
         padding: 12px 20px;
         font-weight: 600;
-        transition: all 0.25s ease;
+        transition: all 0.2s ease;
         box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
-        cursor: pointer; font-size: 14px;
+        cursor: pointer;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        -webkit-tap-highlight-color: transparent;
       }
-      .btn-primary-gradient:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
+      .btn-primary-gradient:active {
+        transform: scale(0.97);
       }
+
       .btn-ghost {
         background: transparent;
         border: 1px solid var(--border-color);
@@ -482,14 +621,21 @@
         border-radius: 12px;
         padding: 12px 20px;
         font-weight: 600;
-        transition: all 0.25s ease;
-        cursor: pointer; font-size: 14px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        -webkit-tap-highlight-color: transparent;
       }
-      .btn-ghost:hover {
+      .btn-ghost:active {
         background: rgba(220, 38, 38, 0.08);
         color: var(--danger);
         border-color: var(--danger);
       }
+
       .btn-danger {
         background: linear-gradient(135deg, var(--danger), var(--danger-dark));
         border: none; color: #fff;
@@ -497,25 +643,33 @@
         padding: 12px 20px;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.25s ease;
+        transition: all 0.2s ease;
         font-size: 14px;
         box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        -webkit-tap-highlight-color: transparent;
       }
-      .btn-danger:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 24px rgba(220, 38, 38, 0.4);
-      }
+      .btn-danger:active { transform: scale(0.97); }
 
-      /* ============ Confirm delete ============ */
+      /* ============================================================
+         Confirm delete
+         ============================================================ */
       .confirm-modal {
-        position: fixed; top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        width: 90%; max-width: 380px;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        margin: auto;
+        width: calc(100% - 40px);
+        max-width: 380px;
+        height: fit-content;
+
         background: var(--card-bg);
         backdrop-filter: blur(30px);
         border: 1px solid var(--card-border);
         border-radius: 20px;
-        padding: 24px;
+        padding: 22px;
         z-index: 1001;
         text-align: center;
         box-shadow: var(--shadow-lg);
@@ -533,26 +687,39 @@
       .confirm-modal h5 { color: var(--text-primary); }
       .confirm-modal p { color: var(--text-secondary); }
 
-      /* ============ Bottom bar ============ */
+      /* ============================================================
+         Bottom bar
+         ============================================================ */
       .bottom-bar {
-        position: fixed; bottom: 12px; left: 50%;
+        position: fixed;
+        bottom: max(12px, env(safe-area-inset-bottom, 0px));
+        left: 50%;
         transform: translateX(-50%);
-        width: calc(100% - 24px); max-width: 720px;
+        width: calc(100% - 24px);
+        max-width: 720px;
         background: var(--card-bg);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
         border: 1px solid var(--card-border);
-        border-radius: 18px;
-        padding: 10px 16px;
-        display: flex; justify-content: space-between; align-items: center;
+        border-radius: 16px;
+        padding: 10px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         box-shadow: var(--shadow-md);
-        z-index: 100; gap: 10px;
+        z-index: 100;
+        gap: 10px;
       }
 
       .filter-toggle {
-        display: flex; align-items: center; gap: 8px;
-        font-size: 13px; cursor: pointer; user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
         color: var(--text-secondary);
+        min-height: 40px;
       }
       .filter-toggle input { display: none; }
       .filter-toggle .switch {
@@ -574,10 +741,20 @@
       .filter-toggle input:checked + .switch { background: var(--success); }
       .filter-toggle input:checked + .switch::after { transform: translateX(-18px); }
 
-      /* ============ Empty ============ */
+      .count-display {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+
+      /* ============================================================
+         Empty
+         ============================================================ */
       .empty-state {
         text-align: center;
-        padding: 60px 20px;
+        padding: 50px 20px;
         color: var(--text-muted);
       }
       .empty-state .icon {
@@ -589,30 +766,47 @@
       .empty-state h5 {
         font-weight: 700;
         color: var(--text-secondary);
+        font-size: 16px;
+      }
+      .empty-state p {
+        font-size: 13px;
+        margin-top: 8px;
       }
 
-      /* ============ Toast ============ */
+      /* ============================================================
+         Toast
+         ============================================================ */
       #toast-container {
         z-index: 99999 !important;
-        position: fixed; top: 16px; left: 50%;
+        position: fixed;
+        top: calc(16px + env(safe-area-inset-top, 0px));
+        left: 50%;
         transform: translateX(-50%);
-        display: flex; flex-direction: column; align-items: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         pointer-events: none;
+        width: calc(100% - 24px);
+        max-width: 420px;
       }
       .custom-toast {
         background: var(--card-bg);
         backdrop-filter: blur(20px);
         border-radius: 14px;
-        padding: 12px 18px;
+        padding: 12px 16px;
         box-shadow: var(--shadow-lg);
-        display: flex; align-items: center; gap: 10px;
-        font-size: 13px; font-weight: 500;
-        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 8px;
         animation: toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         border-right: 4px solid var(--primary);
-        min-width: 260px; max-width: 90vw;
+        width: 100%;
         pointer-events: auto;
         color: var(--text-primary);
+        word-break: break-word;
       }
       .custom-toast.success { border-right-color: var(--success); }
       .custom-toast.warning { border-right-color: var(--warning); }
@@ -624,7 +818,9 @@
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
 
-      /* ============ Dark mode for picker ============ */
+      /* ============================================================
+         Dark mode for picker
+         ============================================================ */
       body.dark-background .datepicker-plot-area {
         background-color: #1e293b !important;
         color: #e2e8f0 !important;
@@ -633,18 +829,124 @@
       body.dark-background .datepicker-day-view .table-days td span { color: #e2e8f0 !important; }
       body.dark-background .datepicker-plot-area .datepicker-header { background: #334155 !important; }
 
-      /* ============ Responsive ============ */
+      /* ============================================================
+         Responsive - Mobile First
+         ============================================================ */
       @media (max-width: 480px) {
-        .stat-value { font-size: 18px; }
-        .brand-logo { width: 38px; height: 38px; min-width: 38px; }
-        .icon-btn { width: 38px; height: 38px; min-width: 38px; font-size: 16px; }
-        .filter-toggle span:last-child { display: none; }
-        .fab { bottom: 80px; left: 16px; width: 54px; height: 54px; font-size: 24px; }
+        .app-container { padding: 8px 10px 0; }
 
         .app-header {
-          top: 4px;
+          padding: 10px;
           border-radius: 16px;
-          padding: 10px 12px;
+        }
+
+        .brand-logo {
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+        }
+
+        .action-chip span {
+          display: none; /* فقط آیکون در موبایل */
+        }
+        .action-chip {
+          gap: 0;
+        }
+        .action-chip i {
+          font-size: 17px;
+        }
+
+        .stat-value { font-size: 17px; }
+        .stat-label { font-size: 9px; }
+
+        .form-modal {
+          padding: 18px 16px;
+          border-radius: 20px;
+          max-height: calc(100dvh - 20px);
+        }
+
+        .filter-toggle span:last-child {
+          display: none; /* متن "فقط انجام شده‌ها" مخفی */
+        }
+
+        .fab {
+          width: 54px;
+          height: 54px;
+          font-size: 24px;
+          left: 14px;
+        }
+      }
+
+      /* موبایل‌های خیلی کوچک */
+      @media (max-width: 360px) {
+        .stat-icon {
+          width: 28px;
+          height: 28px;
+          font-size: 12px;
+        }
+        .stat-value { font-size: 15px; }
+        .stat-label { font-size: 9px; }
+      }
+
+      /* تبلت */
+      @media (min-width: 768px) {
+        .task {
+          padding: 18px;
+        }
+        .task-title { font-size: 17px; }
+        .task-desc { font-size: 14px; }
+        .action-btn { width: 36px; height: 36px; }
+
+        .app-header {
+          padding: 14px 18px;
+        }
+
+        /* در تبلت و دسکتاپ، دکمه‌ها در یک ردیف */
+        .header-top { margin-bottom: 0; }
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          width: auto;
+          grid-template-columns: none;
+        }
+        .action-chip {
+          width: 44px;
+          padding: 0;
+        }
+        .action-chip span { display: none; }
+
+        /* هدر در دسکتاپ: افقی */
+        .app-header {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 12px;
+        }
+        .header-top { display: contents; }
+        .brand-logo { grid-column: 1; grid-row: 1; }
+        .search-wrap { grid-column: 2; grid-row: 1; }
+        .header-actions { grid-column: 3; grid-row: 1; }
+      }
+
+      /* لپ‌تاپ و دسکتاپ بزرگ */
+      @media (min-width: 1024px) {
+        .app-container {
+          max-width: 800px;
+        }
+        .fab {
+          left: calc(50% - 460px);
+        }
+      }
+
+      /* صفحه‌های افقی موبایل */
+      @media (max-height: 500px) and (orientation: landscape) {
+        .form-modal {
+          max-height: calc(100dvh - 16px);
+          padding: 16px;
+        }
+        .form-modal h5 {
+          margin-bottom: 12px;
+          font-size: 15px;
         }
       }
     </style>
@@ -658,30 +960,41 @@
     </div>
 
     <!-- ============ محتوای اصلی ============ -->
-    <div class="container-lg py-3 px-2" id="Rudex">
+    <div class="app-container" id="Rudex">
 
       <!-- ===== Header - Sticky ===== -->
       <div class="app-header" id="appHeader">
-        <div class="brand-logo">
-          <img src="assets/img/maskable-512.png" alt="لوگوی برنامه">
+
+        <!-- ردیف اول: لوگو + جستجو -->
+        <div class="header-top">
+          <div class="brand-logo">
+            <img src="assets/img/maskable-512.png" alt="لوگو">
+          </div>
+
+          <div class="search-wrap">
+            <i class="bi bi-search"></i>
+            <input type="search" class="search-input" placeholder="جستجو در یادداشت‌ها..." id="search" autocomplete="off">
+          </div>
         </div>
 
-        <div class="search-wrap">
-          <i class="bi bi-search"></i>
-          <input type="search" class="search-input" placeholder="جستجو در تسک‌ها..." id="search">
+        <!-- ردیف دوم: دکمه‌های اقدام -->
+        <div class="header-actions">
+          <button class="action-chip" id="exportPdfBtn" title="فاکتور PDF" type="button">
+            <i class="bi bi-file-earmark-pdf"></i>
+            <span>فاکتور</span>
+          </button>
+
+          <button class="action-chip" id="enableNotif" title="نوتیفیکیشن" type="button">
+            <i class="bi bi-bell"></i>
+            <span>اعلان</span>
+          </button>
+
+          <button class="action-chip" id="switchCheckDarken" title="تغییر تم" type="button">
+            <i class="bi bi-moon-stars"></i>
+            <span>تم</span>
+          </button>
         </div>
 
-        <button class="icon-btn" id="exportPdfBtn" title="دانلود فاکتور PDF" type="button">
-          <i class="bi bi-file-earmark-pdf"></i>
-        </button>
-
-        <button class="icon-btn" id="enableNotif" title="فعال‌سازی نوتیفیکیشن" type="button">
-          <i class="bi bi-bell"></i>
-        </button>
-
-        <button class="icon-btn" id="switchCheckDarken" title="تغییر تم" type="button">
-          <i class="bi bi-moon-stars"></i>
-        </button>
       </div>
 
       <!-- ===== Stats ===== -->
@@ -689,7 +1002,7 @@
         <div class="stat-card stat-total">
           <div class="stat-icon"><i class="bi bi-list-task"></i></div>
           <div class="stat-value" id="stat-total">0</div>
-          <div class="stat-label">کل تسک‌ها</div>
+          <div class="stat-label">کل</div>
         </div>
         <div class="stat-card stat-done">
           <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
@@ -708,7 +1021,7 @@
     </div>
 
     <!-- ============ Floating Action Button ============ -->
-    <button class="fab" id="fabAdd" title="تسک جدید" type="button">
+    <button class="fab" id="fabAdd" title="یادداشت جدید" type="button" aria-label="یادداشت جدید">
       <i class="bi bi-plus-lg"></i>
     </button>
 
@@ -719,10 +1032,10 @@
         <span class="switch"></span>
         <span>فقط انجام شده‌ها</span>
       </label>
-      <div class="d-flex align-items-center gap-2">
+      <div class="count-display">
         <i class="bi bi-clipboard-check" style="color: var(--primary);"></i>
         <span id="count" class="fw-bold">0</span>
-        <span class="text-muted">تسک</span>
+        <span class="text-muted">مورد</span>
       </div>
     </div>
 
@@ -733,12 +1046,12 @@
     <div class="form-modal dis-hide" id="display">
       <h5>
         <i class="bi bi-plus-circle" id="form-icon"></i>
-        <span id="form-title">ایجاد تسک جدید</span>
+        <span id="form-title">یادداشت جدید</span>
       </h5>
 
       <div class="mb-3">
-        <label class="form-label" for="titletask">عنوان تسک</label>
-        <input type="text" class="form-control" id="titletask" placeholder="مثلاً: خرید نان">
+        <label class="form-label" for="titletask">عنوان</label>
+        <input type="text" class="form-control" id="titletask" placeholder="مثلاً: خرید نان" autocomplete="off">
       </div>
 
       <div class="mb-3">
@@ -746,15 +1059,15 @@
         <textarea class="form-control" id="taskDiscript" rows="3" placeholder="جزئیات بیشتر..."></textarea>
       </div>
 
-      <div class="mb-4">
-        <label class="form-label" for="taskDeadline">ددلاین (اختیاری) - تاریخ شمسی</label>
+      <div class="mb-3">
+        <label class="form-label" for="taskDeadline">ددلاین (اختیاری) - شمسی</label>
         <input type="text" class="form-control" id="taskDeadline" placeholder="انتخاب تاریخ و ساعت..." readonly>
       </div>
 
-      <div class="d-flex gap-2">
-        <button class="btn-primary-gradient flex-grow-1" id="create2" type="button">
-          <i class="bi bi-check-lg me-1"></i>
-          <span id="submit-text">ایجاد تسک</span>
+      <div class="form-actions">
+        <button class="btn-primary-gradient" id="create2" type="button">
+          <i class="bi bi-check-lg"></i>
+          <span id="submit-text">ذخیره</span>
         </button>
         <button class="btn-ghost" id="cancelForm" type="button">انصراف</button>
       </div>
@@ -765,11 +1078,11 @@
       <div class="icon-warn">
         <i class="bi bi-trash3"></i>
       </div>
-      <h5 class="fw-bold mb-2">حذف تسک</h5>
-      <p class="mb-4" style="font-size: 14px;">آیا از حذف این تسک مطمئن هستید؟ این عمل قابل بازگشت نیست.</p>
+      <h5 class="fw-bold mb-2">حذف یادداشت</h5>
+      <p class="mb-4" style="font-size: 13px; line-height: 1.7;">آیا از حذف این مورد مطمئن هستید؟ این عمل قابل بازگشت نیست.</p>
       <div class="d-flex gap-2">
         <button class="btn-danger flex-grow-1" id="yasdelete" type="button">
-          <i class="bi bi-trash3 me-1"></i> بله، حذف کن
+          <i class="bi bi-trash3"></i> حذف
         </button>
         <button class="btn-ghost flex-grow-1" id="nodeleted" type="button">
           انصراف
