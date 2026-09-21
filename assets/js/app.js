@@ -1,8 +1,8 @@
 /* ============================================================
-   To-Do App - نسخه نهایی PWA با PDF
+   یادداشت‌یار - فایل اصلی برنامه
    ============================================================ */
 
-/* ---------- المان‌ها ---------- */
+/* ---------- گرفتن المان‌ها ---------- */
 const load = document.getElementById("lode");
 const Rudex = document.getElementById("Rudex");
 const display = document.getElementById("display");
@@ -36,34 +36,63 @@ let selectedDeadline = null;
 let notifiedTasks = new Set();
 let pendingDeleteId = null;
 let datepickerReady = false;
+let loaderHidden = false;
 
 /* ============================================================
-   لودر - تضمینی
+   لودر - با ۴ مسیر خروج تضمینی
    ============================================================ */
 function hideLoader() {
-  if (!load) return;
+  if (loaderHidden || !load) return;
+  loaderHidden = true;
+
   try {
-    load.classList.add("fade-out");
+    load.style.transition = "opacity 0.4s ease";
+    load.style.opacity = "0";
+    load.style.pointerEvents = "none";
+
     setTimeout(() => {
       load.style.display = "none";
       load.classList.add("dis-hide");
-    }, 400);
+      console.log("✅ Loader hidden");
+    }, 450);
   } catch (e) {
     load.style.display = "none";
   }
 }
 
-// 3 مسیر خروج مطمئن از لودر
-window.addEventListener("load", () => setTimeout(hideLoader, 800));
-document.addEventListener("DOMContentLoaded", () => setTimeout(hideLoader, 1500));
-setTimeout(hideLoader, 3500);
+// مسیر ۱: بعد از لود کامل صفحه
+window.addEventListener("load", () => {
+  console.log("📌 window.load fired");
+  setTimeout(hideLoader, 500);
+});
+
+// مسیر ۲: بلافاصله بعد از DOM آماده
+if (document.readyState === "complete" || document.readyState === "interactive") {
+  setTimeout(hideLoader, 800);
+} else {
+  document.addEventListener("DOMContentLoaded", () => {
+    console.log("📌 DOMContentLoaded fired");
+    setTimeout(hideLoader, 800);
+  });
+}
+
+// مسیر ۳: تایمر پشتیبان (اگر هر اتفاقی افتاد)
+setTimeout(() => {
+  console.log("⏰ Fallback timeout fired");
+  hideLoader();
+}, 2500);
+
+// مسیر ۴: اگر خطای JS رخ داد
+window.addEventListener("error", () => {
+  console.warn("⚠️ JS error, forcing loader hide");
+  hideLoader();
+});
 
 /* ============================================================
-   تقویم شمسی - با چک کردن آمادگی
+   تقویم شمسی
    ============================================================ */
 function tryInitDatepicker() {
   if (datepickerReady) return true;
-
   if (typeof jQuery === "undefined") return false;
   if (!jQuery.fn || !jQuery.fn.persianDatepicker) return false;
 
@@ -102,11 +131,10 @@ function tryInitDatepicker() {
   }
 }
 
-// تلاش هر ۳۰۰ms تا ۱۰ بار برای راه‌اندازی تقویم
 let dpAttempts = 0;
 const dpInterval = setInterval(() => {
   dpAttempts++;
-  if (tryInitDatepicker() || dpAttempts > 10) {
+  if (tryInitDatepicker() || dpAttempts > 15) {
     clearInterval(dpInterval);
   }
 }, 300);
@@ -206,18 +234,12 @@ function openDatabase() {
       hideLoader();
     };
 
-    request.onblocked = () => {
-      console.warn("⚠️ DB blocked - tab دیگری باز است");
-    };
+    request.onblocked = () => console.warn("⚠️ DB blocked");
 
     request.onsuccess = () => {
       console.log("✅ DB Opened");
       db = request.result;
-      try {
-        displayData();
-      } catch (e) {
-        console.error("displayData error:", e);
-      }
+      try { displayData(); } catch (e) { console.error("displayData error:", e); }
     };
 
     request.onupgradeneeded = (e) => {
@@ -266,10 +288,10 @@ function addData(callback) {
     const tx = db.transaction(["To do"], "readwrite");
     tx.objectStore("To do").add(newItem);
     tx.oncomplete = () => { callback?.(); displayData(); };
-    tx.onerror = () => showToast("خطا در ذخیره تسک", "danger");
+    tx.onerror = () => showToast("خطا در ذخیره یادداشت", "danger");
   } catch (e) {
     console.error("addData error:", e);
-    showToast("خطا در ذخیره تسک", "danger");
+    showToast("خطا در ذخیره یادداشت", "danger");
   }
 }
 
@@ -317,9 +339,7 @@ function getAllTasks() {
       const req = tx.objectStore("To do").getAll();
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => resolve([]);
-    } catch (e) {
-      resolve([]);
-    }
+    } catch (e) { resolve([]); }
   });
 }
 
@@ -393,9 +413,7 @@ function displayData() {
         from.appendChild(buildTaskElement({
           taskId, title, description, completed, createdAt, deadline
         }));
-      } catch (e) {
-        console.error("buildTaskElement error:", e);
-      }
+      } catch (e) { console.error("buildTaskElement error:", e); }
 
       cursor.continue();
     };
@@ -405,7 +423,7 @@ function displayData() {
 }
 
 /* ============================================================
-   ساخت کارت تسک
+   ساخت کارت یادداشت
    ============================================================ */
 function buildTaskElement({ taskId, title, description, completed, createdAt, deadline }) {
   const task = document.createElement("div");
@@ -419,7 +437,7 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
 
   // Header
   const header = document.createElement("div");
-  header.className = "d-flex justify-content-between align-items-start gap-2 mb-1";
+  header.className = "task-header";
 
   const titleEl = document.createElement("div");
   titleEl.className = "task-title";
@@ -511,7 +529,7 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
   });
 
   const btnGroup = document.createElement("div");
-  btnGroup.className = "d-flex gap-2";
+  btnGroup.className = "btn-group-actions";
 
   const editBtn = document.createElement("button");
   editBtn.type = "button";
@@ -546,8 +564,8 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
    ============================================================ */
 function openCreateForm() {
   resetForm();
-  formTitle.textContent = "ایجاد تسک جدید";
-  submitText.textContent = "ایجاد تسک";
+  formTitle.textContent = "یادداشت جدید";
+  submitText.textContent = "ذخیره";
   formIcon.className = "bi bi-plus-circle";
 
   display.classList.remove("dis-hide");
@@ -577,16 +595,14 @@ function openEditForm(id) {
         taskDeadlineInput.value = "";
       }
 
-      formTitle.textContent = "ویرایش تسک";
-      submitText.textContent = "ذخیره تغییرات";
+      formTitle.textContent = "ویرایش یادداشت";
+      submitText.textContent = "ذخیره";
       formIcon.className = "bi bi-pencil-square";
 
       display.classList.remove("dis-hide");
       adduserback.classList.remove("dis-hide");
     };
-  } catch (e) {
-    console.error("openEditForm error:", e);
-  }
+  } catch (e) { console.error("openEditForm error:", e); }
 }
 
 function resetForm() {
@@ -595,8 +611,8 @@ function resetForm() {
   if (titleTaskinput) titleTaskinput.value = "";
   if (titledisinput) titledisinput.value = "";
   if (taskDeadlineInput) taskDeadlineInput.value = "";
-  if (formTitle) formTitle.textContent = "ایجاد تسک جدید";
-  if (submitText) submitText.textContent = "ایجاد تسک";
+  if (formTitle) formTitle.textContent = "یادداشت جدید";
+  if (submitText) submitText.textContent = "ذخیره";
   if (formIcon) formIcon.className = "bi bi-plus-circle";
 }
 
@@ -624,20 +640,19 @@ function closeDeleteConfirm() {
 function confirmDelete() {
   if (pendingDeleteId !== null) {
     deleteData(pendingDeleteId);
-    showToast("تسک حذف شد", "success");
+    showToast("یادداشت حذف شد", "success");
   }
   closeDeleteConfirm();
 }
 
 /* ============================================================
-   پیام‌های خالی
+   پیام‌های خالی - بدون آیکون
    ============================================================ */
 function showNoResultsMessage() {
   from.innerHTML = `
     <div class="empty-state">
-      <div class="icon"><i class="bi bi-search"></i></div>
       <h5>نتیجه‌ای یافت نشد</h5>
-      <p>هیچ تسکی با عبارت "${currentSearchTerm}" یافت نشد</p>
+      <p>هیچ یادداشتی با عبارت «${currentSearchTerm}» پیدا نشد</p>
     </div>
   `;
 }
@@ -645,9 +660,8 @@ function showNoResultsMessage() {
 function showNoCompletedTasksMessage() {
   from.innerHTML = `
     <div class="empty-state">
-      <div class="icon"><i class="bi bi-check2-circle"></i></div>
-      <h5>تسک انجام شده‌ای وجود ندارد</h5>
-      <p>هنوز هیچ تسکی را انجام نداده‌اید</p>
+      <h5>یادداشت انجام‌شده‌ای وجود ندارد</h5>
+      <p>هنوز هیچ یادداشتی را انجام نداده‌اید</p>
     </div>
   `;
 }
@@ -665,8 +679,7 @@ function checkEmptyTasks() {
     msg.id = "empty-msg";
     msg.className = "empty-state";
     msg.innerHTML = `
-      <div class="icon"><i class="bi bi-clipboard2-check"></i></div>
-      <h5>هیچ تسکی نداری!</h5>
+      <h5>هیچ یادداشتی نداری!</h5>
       <p>برای شروع روی دکمه + پایین صفحه کلیک کن</p>
     `;
     from.appendChild(msg);
@@ -725,7 +738,7 @@ function bindEvents() {
 
     const title = titleTaskinput?.value.trim() || "";
     if (!title) {
-      showToast("عنوان تسک را وارد کنید!", "warning");
+      showToast("عنوان یادداشت را وارد کنید!", "warning");
       titleTaskinput?.focus();
       return;
     }
@@ -737,12 +750,12 @@ function bindEvents() {
         deadline: selectedDeadline,
       }, () => {
         closeForm();
-        showToast("تسک با موفقیت ویرایش شد", "success");
+        showToast("یادداشت ویرایش شد", "success");
       });
     } else {
       addData(() => {
         closeForm();
-        showToast("تسک جدید اضافه شد", "success");
+        showToast("یادداشت اضافه شد", "success");
       });
     }
   });
@@ -853,9 +866,7 @@ function checkDeadlines() {
         }
       });
     };
-  } catch (e) {
-    console.error("checkDeadlines error:", e);
-  }
+  } catch (e) { console.error("checkDeadlines error:", e); }
 }
 
 /* ============================================================
@@ -891,7 +902,7 @@ async function generateInvoicePDF() {
     const allTasks = await getAllTasks();
 
     if (!allTasks || allTasks.length === 0) {
-      showToast("هیچ تسکی برای فاکتور وجود ندارد", "warning");
+      showToast("هیچ یادداشتی برای فاکتور وجود ندارد", "warning");
       return;
     }
 
@@ -910,9 +921,7 @@ async function generateInvoicePDF() {
       doc.addFont("Vazirmatn-Regular.ttf", "Vazirmatn", "normal");
       doc.setFont("Vazirmatn");
       fontLoaded = true;
-    } catch (err) {
-      console.warn("فونت لود نشد", err);
-    }
+    } catch (err) { console.warn("فونت لود نشد", err); }
 
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
@@ -925,7 +934,7 @@ async function generateInvoicePDF() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     if (fontLoaded) doc.setFont("Vazirmatn", "normal");
-    doc.text("فاکتور وظایف و سفارشات", pageW - margin, 15, { align: "right" });
+    doc.text("فاکتور یادداشت‌ها", pageW - margin, 15, { align: "right" });
 
     doc.setFontSize(11);
     doc.text(`تاریخ صدور: ${formatPersianDateTime(new Date())}`, pageW - margin, 25, { align: "right" });
@@ -941,7 +950,7 @@ async function generateInvoicePDF() {
     const cardW = (contentW - 8) / 3;
     const cardH = 20;
     const cards = [
-      { label: "کل تسک‌ها", value: total, color: [37, 99, 235] },
+      { label: "کل یادداشت‌ها", value: total, color: [37, 99, 235] },
       { label: "انجام شده", value: doneCount, color: [22, 163, 74] },
       { label: "در انتظار", value: pendingCount, color: [245, 158, 11] },
     ];
@@ -1048,7 +1057,7 @@ async function generateInvoicePDF() {
       doc.setTextColor(148, 163, 184);
       doc.setFontSize(8);
       if (fontLoaded) doc.setFont("Vazirmatn", "normal");
-      doc.text("مدیریت کارها — فاکتور خودکار", margin, pageH - 9, { align: "left" });
+      doc.text("یادداشت‌یار — فاکتور خودکار", margin, pageH - 9, { align: "left" });
       doc.text(`صفحه ${p} از ${totalPages}`, pageW - margin, pageH - 9, { align: "right" });
     }
 
@@ -1075,7 +1084,30 @@ window.addEventListener("appinstalled", () => {
 });
 
 /* ============================================================
-   شروع - اجرای تضمینی
+   Scroll effect روی هدر
+   ============================================================ */
+function initHeaderScroll() {
+  const appHeader = document.getElementById("appHeader");
+  if (!appHeader) return;
+
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        if (window.scrollY > 20) {
+          appHeader.classList.add("scrolled");
+        } else {
+          appHeader.classList.remove("scrolled");
+        }
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+}
+
+/* ============================================================
+   شروع برنامه
    ============================================================ */
 function init() {
   console.log("🚀 init() called");
@@ -1101,11 +1133,16 @@ function init() {
     console.error("❌ deadline checker failed:", e);
   }
 
+  try {
+    initHeaderScroll();
+  } catch (e) {
+    console.error("❌ header scroll failed:", e);
+  }
+
   updateCount(0, 0);
   checkEmptyTasks();
 }
 
-// اجرای init در زمان درست
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
 } else {
