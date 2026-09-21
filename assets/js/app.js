@@ -38,6 +38,7 @@ let selectedDeadline = null;
 let notifiedTasks = new Set();
 let pendingDeleteId = null;
 let datepickerReady = false;
+let datepickerInstance = null;
 let loaderHidden = false;
 let activeFilter = "all";
 let swRegistration = null;
@@ -45,8 +46,9 @@ let notifTimers = new Map();
 let currentInvoiceTaskId = null;
 let currentInvoiceBlob = null;
 let notifEnabled = false;
+let deadlineWatcherInterval = null;
 
-const STORE_NAME = "صورت حساب";
+const STORE_NAME = "نقل و نبات ممتاز سیستان";
 const STORE_TAGLINE = "";
 
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
@@ -113,6 +115,33 @@ function formatPriceInputLive(input) {
 }
 
 /* ============================================================
+   تبدیل رشته تاریخ شمسی به Date میلادی
+   ============================================================ */
+function parsePersianDateString(str) {
+  if (!str || !str.trim()) return null;
+  if (typeof persianDate === "undefined") return null;
+  try {
+    const normalized = toEnglishDigits(str);
+    const m = normalized.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{1,2})/);
+    if (!m) return null;
+
+    const pd = new persianDate();
+    pd.year(parseInt(m[1], 10));
+    pd.month(parseInt(m[2], 10));
+    pd.date(parseInt(m[3], 10));
+    pd.hour(parseInt(m[4], 10));
+    pd.minute(parseInt(m[5], 10));
+
+    const d = pd.toDate();
+    if (d instanceof Date && !isNaN(d.getTime())) return d;
+    return null;
+  } catch (e) {
+    console.warn("parsePersianDateString error:", e);
+    return null;
+  }
+}
+
+/* ============================================================
    لودر
    ============================================================ */
 function hideLoader() {
@@ -149,9 +178,6 @@ function loadNotifPref() {
   try { return localStorage.getItem(NOTIF_PREF_KEY) === "1"; } catch (e) { return false; }
 }
 
-/* ============================================================
-   به‌روزرسانی ظاهر دکمه اعلان
-   ============================================================ */
 function updateNotifButtonUI() {
   if (!enableNotifBtn) return;
   const icon = enableNotifBtn.querySelector("i");
@@ -168,21 +194,16 @@ function updateNotifButtonUI() {
   }
 }
 
-/* ============================================================
-   روشن کردن نوتیفیکیشن
-   ============================================================ */
 async function enableNotifications() {
   if (!("Notification" in window)) {
     showToast("مرورگر شما از نوتیفیکیشن پشتیبانی نمی‌کند", "warning");
     return false;
   }
-
   try {
     let perm = Notification.permission;
     if (perm === "default") {
       perm = await Notification.requestPermission();
     }
-
     if (perm !== "granted") {
       showToast("اجازه نوتیفیکیشن داده نشد. از تنظیمات مرورگر اجازه بده.", "danger");
       notifEnabled = false;
@@ -190,14 +211,11 @@ async function enableNotifications() {
       updateNotifButtonUI();
       return false;
     }
-
     notifEnabled = true;
     saveNotifPref(true);
     updateNotifButtonUI();
-
     showToast("نوتیفیکیشن فعال شد ✅", "success");
 
-    // ثبت Periodic Sync
     if (swRegistration && "periodicSync" in swRegistration) {
       try {
         await swRegistration.periodicSync.register("deadline-check", {
@@ -206,7 +224,6 @@ async function enableNotifications() {
       } catch (err) {}
     }
 
-    // نوتیف تستی
     setTimeout(() => {
       if (swRegistration && notifEnabled) {
         swRegistration.showNotification("🎉 نوتیفیکیشن فعال شد", {
@@ -220,51 +237,35 @@ async function enableNotifications() {
       }
     }, 800);
 
-    // دوباره تایمرها رو زمان‌بندی کن
     scheduleAllDeadlineTimers();
     return true;
-
   } catch (err) {
     showToast("خطا در فعال‌سازی نوتیفیکیشن", "danger");
     return false;
   }
 }
 
-/* ============================================================
-   خاموش کردن نوتیفیکیشن
-   ============================================================ */
 function disableNotifications() {
   notifEnabled = false;
   saveNotifPref(false);
   updateNotifButtonUI();
-
-  // لغو همه تایمرها
   notifTimers.forEach((timer, key) => {
     if (String(key).startsWith("repeat-")) clearInterval(timer);
     else clearTimeout(timer);
   });
   notifTimers.clear();
   notifiedTasks.clear();
-
-  // لغو Periodic Sync
   if (swRegistration && "periodicSync" in swRegistration) {
     try {
       swRegistration.periodicSync.unregister("deadline-check").catch(() => {});
     } catch (err) {}
   }
-
   showToast("نوتیفیکیشن خاموش شد 🔕", "info");
 }
 
-/* ============================================================
-   Toggle
-   ============================================================ */
 async function toggleNotifications() {
-  if (notifEnabled) {
-    disableNotifications();
-  } else {
-    await enableNotifications();
-  }
+  if (notifEnabled) disableNotifications();
+  else await enableNotifications();
 }
 
 /* ============================================================
@@ -274,8 +275,6 @@ async function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   try {
     swRegistration = await navigator.serviceWorker.register("./service-worker.js");
-
-    // اگر قبلاً کاربر نوتیف رو روشن کرده بود، Periodic Sync رو دوباره ثبت کن
     if (notifEnabled && "periodicSync" in swRegistration) {
       try {
         await swRegistration.periodicSync.register("deadline-check", {
@@ -283,7 +282,6 @@ async function registerSW() {
         });
       } catch (err) {}
     }
-
     navigator.serviceWorker.addEventListener("message", handleSWMessage);
   } catch (err) {}
 }
@@ -304,14 +302,31 @@ function tryInitDatepicker() {
   if (datepickerReady) return true;
   if (typeof jQuery === "undefined") return false;
   if (!jQuery.fn || !jQuery.fn.persianDatepicker) return false;
+
+  const input = document.getElementById("taskDeadline");
+  if (!input) return false;
+
   try {
-    jQuery("#taskDeadline").persianDatepicker({
+    try {
+      const oldInstance = jQuery(input).data("persianDatepicker");
+      if (oldInstance) {
+        jQuery(input).persianDatepicker("destroy");
+      }
+    } catch (e) { /* silent */ }
+
+    jQuery(input).persianDatepicker({
       format: "YYYY/MM/DD HH:mm",
       initialValue: false,
       autoClose: true,
       persianDigit: true,
       observer: true,
-      calendar: { persian: { locale: "fa", showHint: true, leapYearMode: "algorithmic" } },
+      calendar: {
+        persian: {
+          locale: "fa",
+          showHint: true,
+          leapYearMode: "algorithmic",
+        },
+      },
       timePicker: {
         enabled: true,
         meridiem: { enabled: false },
@@ -324,18 +339,95 @@ function tryInitDatepicker() {
         todayButton: { enabled: true, text: { fa: "امروز" } },
         submitButton: { enabled: true, text: { fa: "تأیید" } },
       },
-      onSelect: function (unix) { selectedDeadline = new Date(unix); },
+      onSelect: function (unix) {
+        console.log("📅 onSelect fired:", unix);
+        if (unix && !isNaN(unix)) {
+          selectedDeadline = new Date(unix);
+          console.log("✅ selectedDeadline from onSelect:", selectedDeadline);
+          updateClearDeadlineBtn(true);
+        }
+      },
     });
+
     datepickerReady = true;
+    datepickerInstance = jQuery(input).data("persianDatepicker");
+    console.log("✅ Datepicker ready");
     return true;
-  } catch (e) { return false; }
+  } catch (e) {
+    console.warn("⚠️ Datepicker init failed:", e);
+    return false;
+  }
 }
 
 let dpAttempts = 0;
 const dpInterval = setInterval(() => {
   dpAttempts++;
-  if (tryInitDatepicker() || dpAttempts > 15) clearInterval(dpInterval);
-}, 300);
+  if (tryInitDatepicker() || dpAttempts > 20) {
+    clearInterval(dpInterval);
+    if (!datepickerReady) console.warn("⚠️ Datepicker failed after 20 attempts");
+  }
+}, 250);
+
+/* ============================================================
+   نظارت دائمی روی input تاریخ (backup)
+   ============================================================ */
+function startDeadlineWatcher() {
+  if (!taskDeadlineInput) return;
+  if (deadlineWatcherInterval) return; // فقط یک بار اجرا بشه
+
+  // 👇 event listener مستقیم برای تغییر input
+  taskDeadlineInput.addEventListener("input", handleDeadlineInputChange);
+  taskDeadlineInput.addEventListener("change", handleDeadlineInputChange);
+  taskDeadlineInput.addEventListener("blur", handleDeadlineInputChange);
+
+  // 👇 polling هر ۵۰۰ms برای اطمینان بیشتر
+  deadlineWatcherInterval = setInterval(() => {
+    handleDeadlineInputChange();
+  }, 500);
+}
+
+function handleDeadlineInputChange() {
+  if (!taskDeadlineInput) return;
+  const val = taskDeadlineInput.value.trim();
+
+  // اگه input خالیه و selectedDeadline هم خالیه → کاری نکن
+  if (!val) {
+    if (selectedDeadline) {
+      selectedDeadline = null;
+      updateClearDeadlineBtn(false);
+    }
+    return;
+  }
+
+  // اگه input پر ولی selectedDeadline خالیه → از input بخون
+  if (!selectedDeadline) {
+    const parsed = parsePersianDateString(val);
+    if (parsed) {
+      selectedDeadline = parsed;
+      console.log("✅ selectedDeadline from watcher:", selectedDeadline);
+      updateClearDeadlineBtn(true);
+    }
+  }
+}
+
+/* ============================================================
+   دکمه پاک کردن ددلاین
+   ============================================================ */
+function updateClearDeadlineBtn(show) {
+  const btn = document.getElementById("clearDeadlineBtn");
+  if (!btn) return;
+  if (show && taskDeadlineInput && taskDeadlineInput.value.trim()) {
+    btn.classList.remove("dis-hide");
+  } else {
+    btn.classList.add("dis-hide");
+  }
+}
+
+function clearDeadline() {
+  selectedDeadline = null;
+  if (taskDeadlineInput) taskDeadlineInput.value = "";
+  updateClearDeadlineBtn(false);
+}
 
 /* ============================================================
    تم تاریک
@@ -455,17 +547,34 @@ function openDatabase() {
 /* ============================================================
    CRUD
    ============================================================ */
+function getDeadlineForSave() {
+  // اول از selectedDeadline
+  if (selectedDeadline instanceof Date && !isNaN(selectedDeadline.getTime())) {
+    return selectedDeadline;
+  }
+  // اگه خالی بود، از input بخون
+  if (taskDeadlineInput && taskDeadlineInput.value.trim()) {
+    const parsed = parsePersianDateString(taskDeadlineInput.value);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 function addData(callback) {
   if (!db) { showToast("دیتابیس آماده نیست", "danger"); return; }
   try {
     const priceValue = parsePrice(taskPriceInput?.value || "");
+    const deadlineToSave = getDeadlineForSave();
+
+    console.log("💾 addData: deadlineToSave =", deadlineToSave);
+
     const newItem = {
       Title: titleTaskinput.value.trim(),
       Body: titledisinput.value.trim(),
       Price: priceValue,
       completed: false,
       createdAt: new Date(),
-      deadline: selectedDeadline || null,
+      deadline: deadlineToSave,
       lastNotificationAt: null,
     };
     const tx = db.transaction(["To do"], "readwrite");
@@ -478,7 +587,10 @@ function addData(callback) {
     };
     tx.oncomplete = () => { callback?.(); displayData(); };
     tx.onerror = () => showToast("خطا در ذخیره یادداشت", "danger");
-  } catch (e) { showToast("خطا در ذخیره یادداشت", "danger"); }
+  } catch (e) {
+    console.error("addData error:", e);
+    showToast("خطا در ذخیره یادداشت", "danger");
+  }
 }
 
 function updateTask(id, updates, callback) {
@@ -499,7 +611,7 @@ function updateTask(id, updates, callback) {
         displayData();
       };
     };
-  } catch (e) {}
+  } catch (e) { console.error("updateTask error:", e); }
 }
 
 function updateTaskStatus(id, completed) {
@@ -645,10 +757,10 @@ function displayData() {
       visibleCount++;
       try {
         from.appendChild(buildTaskElement({ taskId, title, description, price, completed, createdAt, deadline }));
-      } catch (err) {}
+      } catch (err) { console.error("buildTaskElement error:", err); }
       cursor.continue();
     };
-  } catch (e) {}
+  } catch (e) { console.error("displayData error:", e); }
 }
 
 /* ============================================================
@@ -817,11 +929,16 @@ function openEditForm(id) {
         }
       }
       if (data.deadline) {
-        selectedDeadline = new Date(data.deadline);
-        taskDeadlineInput.value = dateToPersianInput(selectedDeadline);
+        const d = new Date(data.deadline);
+        if (!isNaN(d.getTime())) {
+          selectedDeadline = d;
+          if (taskDeadlineInput) taskDeadlineInput.value = dateToPersianInput(d);
+          updateClearDeadlineBtn(true);
+        }
       } else {
         selectedDeadline = null;
-        taskDeadlineInput.value = "";
+        if (taskDeadlineInput) taskDeadlineInput.value = "";
+        updateClearDeadlineBtn(false);
       }
       formTitle.textContent = "ویرایش یادداشت";
       submitText.textContent = "ذخیره";
@@ -842,6 +959,7 @@ function resetForm() {
   if (formTitle) formTitle.textContent = "یادداشت جدید";
   if (submitText) submitText.textContent = "ذخیره";
   if (formIcon) formIcon.className = "bi bi-plus-circle";
+  updateClearDeadlineBtn(false);
 }
 
 function closeForm() {
@@ -979,12 +1097,14 @@ function buildInvoiceHTML(task) {
       <span style="font-size:18px;font-weight:800;color:#059669;letter-spacing:0;white-space:nowrap;direction:rtl;">${formatPrice(price)} <span style="font-size:11px;font-weight:500;opacity:0.85;">تومان</span></span>
     </div>` : "";
 
+  const subLine = STORE_TAGLINE ? `<p dir="rtl" lang="fa" style="font-family:${ff};font-size:12px;color:#ffffff;opacity:0.9;margin:0 0 14px 0;line-height:1.5;direction:rtl;text-align:right;letter-spacing:0;">${STORE_TAGLINE}</p>` : "";
+
   return `
     <div class="invoice-card" id="invoiceCard" dir="rtl" lang="fa" style="width:100%;max-width:100%;background:#ffffff;color:#1e293b;font-family:${ff};border-radius:20px;overflow:hidden;direction:rtl;text-align:right;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
 
       <div class="invoice-header" style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);color:#ffffff;padding:24px 22px;direction:rtl;position:relative;">
         <h1 class="invoice-store-name" dir="rtl" lang="fa" style="font-family:${ff};font-size:22px;font-weight:800;margin:0 0 8px 0;padding:0;color:#ffffff;line-height:1.7;letter-spacing:0;word-spacing:0;direction:rtl;text-align:right;white-space:nowrap;overflow:visible;">${STORE_NAME}</h1>
-        <p dir="rtl" lang="fa" style="font-family:${ff};font-size:12px;color:#ffffff;opacity:0.9;margin:0 0 14px 0;line-height:1.5;direction:rtl;text-align:right;letter-spacing:0;">${STORE_TAGLINE}</p>
+        ${subLine}
         <span dir="rtl" lang="fa" style="display:inline-block;background:rgba(255,255,255,0.22);color:#ffffff;padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,0.4);font-family:${ff};letter-spacing:0;">✅ فاکتور رسمی</span>
       </div>
 
@@ -1018,9 +1138,9 @@ function buildInvoiceHTML(task) {
       </div>
 
       <div dir="rtl" style="padding:16px 22px 20px;background:#f8fafc;text-align:center;border-top:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
-        <p dir="rtl" lang="fa" style="font-size:14px;font-weight:800;color:#1e40af;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;">🙏 از خرید شما سپاسگزاریم</p>
+        <p dir="rtl" lang="fa" style="font-size:14px;font-weight:800;color:#1e40af;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;">سپاس از خرید شما سپاسگزاریم</p>
         <p dir="rtl" lang="fa" style="font-size:11px;color:#64748b;margin:0;line-height:1.8;font-family:${ff};letter-spacing:0;">جهت سفارشات بیشتر و پیگیری با ما در تماس باشید</p>
-        <p dir="rtl" lang="fa" style="font-size:9px;color:#94a3b8;margin:10px 0 0 0;font-family:${ff};letter-spacing:0;">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
+    
       </div>
 
     </div>
@@ -1268,12 +1388,16 @@ function bindEvents() {
       return;
     }
     const priceValue = parsePrice(taskPriceInput?.value || "");
+    const deadlineToSave = getDeadlineForSave();
+
+    console.log("💾 create2: deadlineToSave =", deadlineToSave);
+
     if (editingTaskId !== null) {
       updateTask(editingTaskId, {
         Title: title,
         Body: titledisinput.value.trim(),
         Price: priceValue,
-        deadline: selectedDeadline,
+        deadline: deadlineToSave,
       }, () => {
         closeForm();
         showToast("یادداشت ویرایش شد", "success");
@@ -1300,6 +1424,14 @@ function bindEvents() {
         const num = parseInt(digits, 10);
         if (!isNaN(num)) this.value = num.toLocaleString("en-US");
       }
+    });
+  }
+
+  const clearDeadlineBtn = document.getElementById("clearDeadlineBtn");
+  if (clearDeadlineBtn) {
+    clearDeadlineBtn.addEventListener("click", () => {
+      clearDeadline();
+      showToast("تاریخ حذف شد", "info");
     });
   }
 
@@ -1332,7 +1464,6 @@ function bindEvents() {
     if (e.target === invoicePreview) closeInvoicePreview();
   });
 
-  // 🆕 Toggle نوتیفیکیشن
   enableNotifBtn?.addEventListener("click", toggleNotifications);
 
   exportPdfBtn?.addEventListener("click", generateInvoicePDF);
@@ -1424,7 +1555,7 @@ async function generateInvoicePDF() {
     if (fontLoaded) doc.setFont("Vazirmatn", "normal");
     doc.text(STORE_NAME, pageW - margin, 15, { align: "right" });
     doc.setFontSize(10);
-    doc.text(STORE_TAGLINE, pageW - margin, 23, { align: "right" });
+    if (STORE_TAGLINE) doc.text(STORE_TAGLINE, pageW - margin, 23, { align: "right" });
     doc.setFontSize(9);
     doc.text(`تاریخ: ${formatPersianDateTime(new Date())}`, pageW - margin, 31, { align: "right" });
     let y = 45;
@@ -1521,6 +1652,7 @@ async function generateInvoicePDF() {
     doc.save(fileName);
     showToast("فاکتور PDF دانلود شد ✅", "success");
   } catch (err) {
+    console.error("PDF error:", err);
     showToast("خطا در ساخت فاکتور", "danger");
   }
 }
@@ -1561,19 +1693,22 @@ function initHeaderScroll() {
    Init
    ============================================================ */
 function init() {
-  try { bindEvents(); } catch (e) {}
+  console.log("🚀 init()");
 
-  // 🆕 بازیابی وضعیت نوتیفیکیشن از localStorage
+  try { bindEvents(); } catch (e) { console.error("bindEvents:", e); }
+
+  // 👈 شروع نظارت روی input تاریخ
+  try { startDeadlineWatcher(); } catch (e) { console.error("deadlineWatcher:", e); }
+
   notifEnabled = loadNotifPref();
-  // اگه کاربر قبلاً روشن کرده بود ولی مجوز پس گرفته شده، خاموشش کن
   if (notifEnabled && "Notification" in window && Notification.permission !== "granted") {
     notifEnabled = false;
     saveNotifPref(false);
   }
   updateNotifButtonUI();
 
-  try { registerSW(); } catch (e) {}
-  try { openDatabase(); } catch (e) { hideLoader(); }
+  try { registerSW(); } catch (e) { console.error("SW:", e); }
+  try { openDatabase(); } catch (e) { console.error("DB:", e); hideLoader(); }
   try { initHeaderScroll(); } catch (e) {}
   updateCount(0, 0);
   checkEmptyTasks();
