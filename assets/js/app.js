@@ -48,7 +48,7 @@ let currentInvoiceBlob = null;
 let notifEnabled = false;
 let deadlineWatcherInterval = null;
 
-const STORE_NAME = "نقل و نبات ممتاز سیستان";
+const STORE_NAME = "صورتحساب"
 const STORE_TAGLINE = "";
 
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
