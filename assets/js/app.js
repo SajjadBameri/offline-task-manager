@@ -1036,7 +1036,7 @@ function buildInvoiceHTML(task) {
       <div dir="rtl" style="padding:16px 22px 20px;background:#f8fafc;text-align:center;border-top:1px dashed #cbd5e1;font-family:${ff};direction:rtl;">
         <p dir="rtl" lang="fa" style="font-size:14px;font-weight:800;color:#1e40af;margin:0 0 6px 0;font-family:${ff};letter-spacing:0;">🙏 از خرید شما سپاسگزاریم</p>
         <p dir="rtl" lang="fa" style="font-size:11px;color:#64748b;margin:0;line-height:1.8;font-family:${ff};letter-spacing:0;">جهت سفارشات بیشتر و پیگیری با ما در تماس باشید</p>
-        <p dir="rtl" lang="fa" style="font-size:9px;color:#94a3b8;margin:10px 0 0 0;font-family:${ff};letter-spacing:0;">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
+  
       </div>
 
     </div>
