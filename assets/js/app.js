@@ -45,8 +45,8 @@ let notifTimers = new Map();
 let currentInvoiceTaskId = null;
 let currentInvoiceBlob = null;
 
-const STORE_NAME = "نقل و نبات ممتاز سیستان";
-const STORE_TAGLINE = "کیفیت برتر، طعم اصیل";
+const STORE_NAME = "صورت حساب خرید";
+const STORE_TAGLINE = "";
 
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
