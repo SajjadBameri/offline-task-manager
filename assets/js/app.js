@@ -7,6 +7,7 @@ const load = document.getElementById("lode");
 const display = document.getElementById("display");
 const titleTaskinput = document.getElementById("titletask");
 const titledisinput = document.getElementById("taskDiscript");
+const taskPriceInput = document.getElementById("taskPrice");
 const taskDeadlineInput = document.getElementById("taskDeadline");
 const formTitle = document.getElementById("form-title");
 const formIcon = document.getElementById("form-icon");
@@ -25,6 +26,10 @@ const yasdelete = document.getElementById("yasdelete");
 const enableNotifBtn = document.getElementById("enableNotif");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const toastContainer = document.getElementById("toast-container");
+const invoicePreview = document.getElementById("invoicePreview");
+const invoiceRenderArea = document.getElementById("invoiceRenderArea");
+const shareInvoiceBtn = document.getElementById("shareInvoiceBtn");
+const closePreviewBtn = document.getElementById("closePreviewBtn");
 
 /* ---------- وضعیت ---------- */
 let db = null;
@@ -37,8 +42,109 @@ let pendingDeleteId = null;
 let datepickerReady = false;
 let loaderHidden = false;
 let activeFilter = "all";
-let swRegistration = null;   // 👈 نگه‌داری Service Worker
-let notifTimers = new Map(); // 👈 تایمرهای فعال برای هر تسک
+let swRegistration = null;
+let notifTimers = new Map();
+let currentInvoiceTaskId = null;
+let currentInvoiceBlob = null;
+
+/* ---------- ثابت‌ها ---------- */
+const STORE_NAME = "نقل و نبات ممتاز سیستان";
+const STORE_TAGLINE = "کیفیت برتر، طعم اصیل";
+
+/* ============================================================
+   توابع کمکی عدد و قیمت
+   ============================================================ */
+const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+/* تبدیل ارقام فارسی/عربی به انگلیسی */
+function toEnglishDigits(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[۰-۹٠-٩]/g, (d) => {
+    const pIdx = PERSIAN_DIGITS.indexOf(d);
+    if (pIdx !== -1) return String(pIdx);
+    const aIdx = ARABIC_DIGITS.indexOf(d);
+    if (aIdx !== -1) return String(aIdx);
+    return d;
+  });
+}
+
+/* گرفتن فقط ارقام انگلیسی از یک رشته */
+function extractDigits(str) {
+  if (!str) return "";
+  return toEnglishDigits(String(str)).replace(/[^\d]/g, "");
+}
+
+/* تبدیل رشته قیمت به عدد */
+function parsePrice(priceStr) {
+  const digits = extractDigits(priceStr);
+  if (!digits) return 0;
+  const num = parseInt(digits, 10);
+  return isNaN(num) ? 0 : num;
+}
+
+/* فرمت قیمت برای نمایش (با ارقام فارسی) */
+function formatPrice(price) {
+  if (price === null || price === undefined || price === "") return "";
+  const num = typeof price === "number" ? price : parsePrice(price);
+  if (!num || isNaN(num) || num === 0) return "";
+  return num.toLocaleString("fa-IR");
+}
+
+/* فرمت زنده فیلد قیمت با حفظ موقعیت کرسر */
+function formatPriceInputLive(input) {
+  if (!input) return;
+
+  const rawValue = input.value;
+  const caretPos = input.selectionStart || 0;
+
+  // چند رقم قبل از کرسر وجود داشت؟
+  const digitsBeforeCaret = extractDigits(rawValue.slice(0, caretPos)).length;
+
+  // همه ارقام رو بگیر
+  const allDigits = extractDigits(rawValue);
+
+  if (!allDigits) {
+    input.value = "";
+    return;
+  }
+
+  // صفرهای ابتدایی رو حذف کن
+  const cleanDigits = allDigits.replace(/^0+/, "") || "0";
+
+  // عدد رو بساز
+  const num = parseInt(cleanDigits, 10);
+  if (isNaN(num)) {
+    input.value = "";
+    return;
+  }
+
+  // فرمت با کاما و ارقام انگلیسی (چون dir=ltr هست)
+  // از en-US استفاده می‌کنیم که کاما بذاره
+  const formatted = num.toLocaleString("en-US");
+
+  // موقعیت جدید کرسر رو پیدا کن (بر اساس تعداد رقم قبلش)
+  let newCaret = formatted.length;
+  if (digitsBeforeCaret > 0) {
+    let count = 0;
+    for (let i = 0; i < formatted.length; i++) {
+      if (/\d/.test(formatted[i])) {
+        count++;
+        if (count === digitsBeforeCaret) {
+          newCaret = i + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  input.value = formatted;
+
+  // کرسر رو برگردون
+  try {
+    input.setSelectionRange(newCaret, newCaret);
+  } catch (e) { /* silent */ }
+}
 
 /* ============================================================
    لودر
@@ -69,46 +175,33 @@ setTimeout(hideLoader, 2500);
 window.addEventListener("error", hideLoader);
 
 /* ============================================================
-   ثبت Service Worker
+   Service Worker
    ============================================================ */
 async function registerSW() {
-  if (!("serviceWorker" in navigator)) {
-    console.warn("⚠️ Service Worker پشتیبانی نمی‌شه");
-    return;
-  }
-
+  if (!("serviceWorker" in navigator)) return;
   try {
     swRegistration = await navigator.serviceWorker.register("./service-worker.js");
     console.log("✅ SW registered:", swRegistration.scope);
 
-    // درخواست Periodic Background Sync
     if ("periodicSync" in swRegistration) {
       try {
         const status = await navigator.permissions.query({ name: "periodic-background-sync" });
         if (status.state === "granted") {
           await swRegistration.periodicSync.register("deadline-check", {
-            minInterval: 24 * 60 * 60 * 1000, // ۲۴ ساعت
+            minInterval: 24 * 60 * 60 * 1000,
           });
-          console.log("✅ Periodic sync registered");
         }
-      } catch (err) {
-        console.warn("Periodic sync not available:", err);
-      }
+      } catch (err) { /* silent */ }
     }
 
-    // گوش دادن به پیام‌های SW
     navigator.serviceWorker.addEventListener("message", handleSWMessage);
-
   } catch (err) {
     console.warn("⚠️ SW registration failed:", err);
   }
 }
 
-/* ---------- پیام‌های از SW ---------- */
 function handleSWMessage(event) {
   const data = event.data || {};
-  console.log("📨 Message from SW:", data);
-
   if (data.type === "MARK_DONE" && data.taskId != null) {
     updateTaskStatus(data.taskId, true);
     showToast("✅ تسک انجام شد", "success");
@@ -152,10 +245,7 @@ function tryInitDatepicker() {
     });
     datepickerReady = true;
     return true;
-  } catch (e) {
-    console.warn("⚠️ Datepicker init failed:", e);
-    return false;
-  }
+  } catch (e) { return false; }
 }
 
 let dpAttempts = 0;
@@ -180,7 +270,7 @@ try {
       icon.classList.add("bi-moon-stars");
     }
   });
-} catch (e) { console.warn(e); }
+} catch (e) { /* silent */ }
 
 /* ============================================================
    توابع تاریخ
@@ -251,7 +341,7 @@ function getDeadlineStatus(deadline) {
    ============================================================ */
 function openDatabase() {
   try {
-    const request = window.indexedDB.open("To do", 4);
+    const request = window.indexedDB.open("To do", 6);
 
     request.onerror = (e) => {
       console.error("❌ DB Failed", e);
@@ -266,11 +356,9 @@ function openDatabase() {
       db = request.result;
       try {
         displayData();
-        // 👈 چک کردن نوتیف‌های از دست رفته
         setTimeout(checkMissedNotifications, 1500);
-        // 👈 زمان‌بندی تایمرهای ددلاین
         setTimeout(scheduleAllDeadlineTimers, 2000);
-      } catch (e) { console.error("displayData error:", e); }
+      } catch (e) { console.error(e); }
     };
 
     request.onupgradeneeded = (e) => {
@@ -308,20 +396,21 @@ function openDatabase() {
 function addData(callback) {
   if (!db) { showToast("دیتابیس آماده نیست", "danger"); return; }
   try {
+    const priceValue = parsePrice(taskPriceInput?.value || "");
     const newItem = {
       Title: titleTaskinput.value.trim(),
       Body: titledisinput.value.trim(),
+      Price: priceValue,
       completed: false,
       createdAt: new Date(),
       deadline: selectedDeadline || null,
-      lastNotificationAt: null, // 👈 برای پیگیری نوتیف‌ها
+      lastNotificationAt: null,
     };
 
     const tx = db.transaction(["To do"], "readwrite");
     const req = tx.objectStore("To do").add(newItem);
     req.onsuccess = () => {
       const newId = req.result;
-      // 👈 زمان‌بندی نوتیف برای تسک جدید
       if (newItem.deadline && !newItem.completed) {
         scheduleDeadlineTimer(newId, new Date(newItem.deadline), newItem.Title);
       }
@@ -347,25 +436,18 @@ function updateTask(id, updates, callback) {
       Object.assign(data, updates);
       store.put(data);
       tx.oncomplete = () => {
-        // 👈 آپدیت تایمر
-        if (data.completed) {
-          cancelNotifTimer(id);
-        } else if (data.deadline) {
-          scheduleDeadlineTimer(id, new Date(data.deadline), data.Title);
-        }
+        if (data.completed) cancelNotifTimer(id);
+        else if (data.deadline) scheduleDeadlineTimer(id, new Date(data.deadline), data.Title);
         callback?.();
         displayData();
       };
     };
-  } catch (e) {
-    console.error("updateTask error:", e);
-  }
+  } catch (e) { console.error("updateTask error:", e); }
 }
 
 function updateTaskStatus(id, completed) {
   updateTask(id, { completed }, () => {
     if (showOnlyCompleted) displayData();
-    // 👈 اگه انجام شد، تایمرش کنسل بشه
     if (completed) cancelNotifTimer(id);
   });
 }
@@ -376,12 +458,10 @@ function deleteData(id) {
     const tx = db.transaction(["To do"], "readwrite");
     tx.objectStore("To do").delete(id);
     tx.oncomplete = () => {
-      cancelNotifTimer(id); // 👈 کنسل کردن تایمر
+      cancelNotifTimer(id);
       displayData();
     };
-  } catch (e) {
-    console.error("deleteData error:", e);
-  }
+  } catch (e) { console.error("deleteData error:", e); }
 }
 
 function getAllTasks() {
@@ -393,6 +473,18 @@ function getAllTasks() {
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => resolve([]);
     } catch (e) { resolve([]); }
+  });
+}
+
+function getTaskById(id) {
+  return new Promise((resolve) => {
+    if (!db) return resolve(null);
+    try {
+      const tx = db.transaction(["To do"], "readonly");
+      const req = tx.objectStore("To do").get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
   });
 }
 
@@ -465,14 +557,12 @@ function displayData() {
 
       if (!cursor) {
         updateStats(totalCount, totalDone, totalUrgent);
-
         if (visibleCount === 0) {
           if (currentSearchTerm) showNoResultsMessage();
           else if (activeFilter === "done" || showOnlyCompleted) showNoCompletedTasksMessage();
           else if (activeFilter === "urgent") showNoUrgentTasksMessage();
           else checkEmptyTasks();
         }
-
         updateCount(visibleCount, totalCount);
         return;
       }
@@ -480,6 +570,7 @@ function displayData() {
       const value = cursor.value;
       const title = (value.Title || "").trim();
       const description = (value.Body || "").trim();
+      const price = value.Price || 0;
       const completed = value.completed || false;
       const taskId = value.id;
       const createdAt = value.createdAt ? new Date(value.createdAt) : new Date();
@@ -515,21 +606,19 @@ function displayData() {
 
       try {
         from.appendChild(buildTaskElement({
-          taskId, title, description, completed, createdAt, deadline
+          taskId, title, description, price, completed, createdAt, deadline
         }));
       } catch (err) { console.error("buildTaskElement error:", err); }
 
       cursor.continue();
     };
-  } catch (e) {
-    console.error("displayData error:", e);
-  }
+  } catch (e) { console.error("displayData error:", e); }
 }
 
 /* ============================================================
    ساخت کارت یادداشت
    ============================================================ */
-function buildTaskElement({ taskId, title, description, completed, createdAt, deadline }) {
+function buildTaskElement({ taskId, title, description, price, completed, createdAt, deadline }) {
   const task = document.createElement("div");
   task.className = "task";
   task.dataset.id = taskId;
@@ -595,6 +684,17 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
     descEl.style.fontStyle = "italic";
   }
 
+  task.appendChild(header);
+  task.appendChild(descEl);
+
+  // 🆕 نمایش قیمت
+  if (price && price > 0) {
+    const priceEl = document.createElement("div");
+    priceEl.className = "task-price";
+    priceEl.innerHTML = `<i class="bi bi-cash-coin"></i><span>${formatPrice(price)} تومان</span>`;
+    task.appendChild(priceEl);
+  }
+
   const metaEl = document.createElement("div");
   metaEl.className = "task-meta";
   metaEl.innerHTML = `
@@ -609,6 +709,7 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
       </div>
     ` : ""}
   `;
+  task.appendChild(metaEl);
 
   const actions = document.createElement("div");
   actions.className = "task-actions";
@@ -631,6 +732,13 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
   const btnGroup = document.createElement("div");
   btnGroup.className = "btn-group-actions";
 
+  const shareBtn = document.createElement("button");
+  shareBtn.type = "button";
+  shareBtn.className = "action-btn share";
+  shareBtn.innerHTML = '<i class="bi bi-share-fill"></i>';
+  shareBtn.title = "اشتراک‌گذاری فاکتور";
+  shareBtn.addEventListener("click", () => openInvoicePreview(taskId));
+
   const editBtn = document.createElement("button");
   editBtn.type = "button";
   editBtn.className = "action-btn edit";
@@ -645,15 +753,12 @@ function buildTaskElement({ taskId, title, description, completed, createdAt, de
   delBtn.title = "حذف";
   delBtn.addEventListener("click", () => openDeleteConfirm(taskId));
 
+  btnGroup.appendChild(shareBtn);
   btnGroup.appendChild(editBtn);
   btnGroup.appendChild(delBtn);
 
   actions.appendChild(doneToggle);
   actions.appendChild(btnGroup);
-
-  task.appendChild(header);
-  task.appendChild(descEl);
-  task.appendChild(metaEl);
   task.appendChild(actions);
 
   return task;
@@ -686,6 +791,15 @@ function openEditForm(id) {
       titleTaskinput.value = data.Title || "";
       titledisinput.value = data.Body || "";
 
+      if (taskPriceInput) {
+        if (data.Price && data.Price > 0) {
+          // برای نمایش در input، از فرمت en-US استفاده کن
+          taskPriceInput.value = Number(data.Price).toLocaleString("en-US");
+        } else {
+          taskPriceInput.value = "";
+        }
+      }
+
       if (data.deadline) {
         selectedDeadline = new Date(data.deadline);
         taskDeadlineInput.value = dateToPersianInput(selectedDeadline);
@@ -709,6 +823,7 @@ function resetForm() {
   selectedDeadline = null;
   if (titleTaskinput) titleTaskinput.value = "";
   if (titledisinput) titledisinput.value = "";
+  if (taskPriceInput) taskPriceInput.value = "";
   if (taskDeadlineInput) taskDeadlineInput.value = "";
   if (formTitle) formTitle.textContent = "یادداشت جدید";
   if (submitText) submitText.textContent = "ذخیره";
@@ -777,12 +892,10 @@ function showNoUrgentTasksMessage() {
 function checkEmptyTasks() {
   const old = document.getElementById("empty-msg");
   if (old) old.remove();
-
   setTimeout(() => {
     if (!from) return;
     if (from.querySelector(".task")) return;
     if (from.querySelector(".empty-state")) return;
-
     const msg = document.createElement("div");
     msg.id = "empty-msg";
     msg.className = "empty-state";
@@ -818,62 +931,269 @@ function updateStats(total, done, urgent) {
 }
 
 /* ============================================================
-   🆕 سیستم نوتیفیکیشن پیشرفته
+   🧾 سیستم فاکتور و اشتراک‌گذاری
    ============================================================ */
+async function openInvoicePreview(taskId) {
+  const task = await getTaskById(taskId);
+  if (!task) {
+    showToast("تسک پیدا نشد", "danger");
+    return;
+  }
 
-/* ---------- زمان‌بندی تایمر برای یه تسک ---------- */
+  currentInvoiceTaskId = taskId;
+  currentInvoiceBlob = null;
+
+  invoiceRenderArea.innerHTML = buildInvoiceHTML(task);
+  invoicePreview.classList.remove("dis-hide");
+  document.body.style.overflow = "hidden";
+
+  setTimeout(() => generateInvoiceImage(), 300);
+}
+
+function closeInvoicePreview() {
+  invoicePreview.classList.add("dis-hide");
+  document.body.style.overflow = "";
+  invoiceRenderArea.innerHTML = "";
+  currentInvoiceTaskId = null;
+  currentInvoiceBlob = null;
+}
+
+function buildInvoiceHTML(task) {
+  const title = escapeHtml(task.Title || "بدون عنوان");
+  const description = task.Body ? escapeHtml(task.Body) : "";
+  const price = task.Price || 0;
+  const createdAt = task.createdAt ? new Date(task.createdAt) : new Date();
+  const deadline = task.deadline ? new Date(task.deadline) : null;
+
+  const invoiceNo = "INV-" + String(task.id).padStart(6, "0");
+
+  const itemRows = [];
+
+  itemRows.push(`
+    <div class="invoice-item-row">
+      <span class="row-label"><i class="bi bi-calendar-plus"></i> تاریخ ثبت</span>
+      <span class="row-value">${formatPersianDate(createdAt)} - ${formatPersianTime(createdAt)}</span>
+    </div>
+  `);
+
+  if (deadline) {
+    itemRows.push(`
+      <div class="invoice-item-row">
+        <span class="row-label"><i class="bi bi-alarm"></i> تاریخ تحویل</span>
+        <span class="row-value">${formatPersianDate(deadline)} - ${formatPersianTime(deadline)}</span>
+      </div>
+    `);
+  }
+
+  if (price > 0) {
+    itemRows.push(`
+      <div class="invoice-item-row">
+        <span class="row-label"><i class="bi bi-cash-coin"></i> مبلغ</span>
+        <span class="row-value">${formatPrice(price)} تومان</span>
+      </div>
+    `);
+  }
+
+  const totalSection = price > 0 ? `
+    <div class="invoice-total">
+      <div class="invoice-total-label">
+        <i class="bi bi-receipt-cutoff"></i>
+        <span>جمع کل قابل پرداخت</span>
+      </div>
+      <div class="invoice-total-value">
+        ${formatPrice(price)}
+        <span class="unit">تومان</span>
+      </div>
+    </div>
+  ` : "";
+
+  return `
+    <div class="invoice-card" id="invoiceCard">
+      <div class="invoice-header">
+        <h1 class="invoice-store-name">${STORE_NAME}</h1>
+        <p class="invoice-store-sub">${STORE_TAGLINE}</p>
+        <span class="invoice-badge">
+          <i class="bi bi-patch-check-fill"></i> فاکتور رسمی
+        </span>
+      </div>
+
+      <div class="invoice-divider"></div>
+
+      <div class="invoice-meta">
+        <div class="invoice-meta-item">
+          <span class="label">شماره فاکتور</span>
+          <span class="value">${invoiceNo}</span>
+        </div>
+        <div class="invoice-meta-item">
+          <span class="label">تاریخ صدور</span>
+          <span class="value">${formatPersianDate(new Date())}</span>
+        </div>
+      </div>
+
+      <div class="invoice-body">
+        <h3 class="invoice-section-title">
+          <i class="bi bi-box-seam-fill"></i>
+          <span>جزئیات سفارش</span>
+        </h3>
+
+        <div class="invoice-item">
+          <h4 class="invoice-item-title">${title}</h4>
+          ${description ? `<p class="invoice-item-desc">${description}</p>` : ""}
+          <div class="invoice-item-rows">
+            ${itemRows.join("")}
+          </div>
+        </div>
+
+        ${totalSection}
+      </div>
+
+      <div class="invoice-footer">
+        <p class="thanks">🙏 از خرید شما سپاسگزاریم</p>
+        <p class="contact">
+          جهت سفارشات بیشتر و پیگیری با ما در تماس باشید
+        </p>
+        <p class="watermark">این فاکتور به صورت خودکار توسط اپلیکیشن یادداشت‌یار صادر شده است</p>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function generateInvoiceImage() {
+  if (typeof html2canvas === "undefined") {
+    console.warn("html2canvas not loaded");
+    return null;
+  }
+
+  const card = document.getElementById("invoiceCard");
+  if (!card) return null;
+
+  try {
+    const canvas = await html2canvas(card, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      windowWidth: card.scrollWidth,
+      windowHeight: card.scrollHeight,
+    });
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        currentInvoiceBlob = blob;
+        resolve(blob);
+      }, "image/png", 1.0);
+    });
+  } catch (err) {
+    console.error("html2canvas error:", err);
+    return null;
+  }
+}
+
+async function shareInvoice() {
+  if (!currentInvoiceTaskId) {
+    showToast("خطا: تسک انتخاب نشده", "danger");
+    return;
+  }
+
+  const task = await getTaskById(currentInvoiceTaskId);
+  if (!task) {
+    showToast("تسک پیدا نشد", "danger");
+    return;
+  }
+
+  if (!currentInvoiceBlob) {
+    showToast("در حال آماده‌سازی تصویر...", "info");
+    await generateInvoiceImage();
+  }
+
+  if (!currentInvoiceBlob) {
+    showToast("خطا در ساخت تصویر فاکتور", "danger");
+    return;
+  }
+
+  const fileName = `invoice-${task.id}-${Date.now()}.png`;
+  const file = new File([currentInvoiceBlob], fileName, { type: "image/png" });
+
+  const shareText = `🧾 فاکتور از ${STORE_NAME}\n\n📦 ${task.Title}${
+    task.Price ? `\n💰 مبلغ: ${formatPrice(task.Price)} تومان` : ""
+  }\n\n🙏 از خرید شما سپاسگزاریم`;
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `فاکتور ${STORE_NAME}`,
+        text: shareText,
+      });
+      showToast("✅ فاکتور اشتراک‌گذاری شد", "success");
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      console.error("Share failed:", err);
+      downloadInvoiceImage(fileName);
+    }
+  } else {
+    showToast("اشتراک‌گذاری مستقیم پشتیبانی نمی‌شود. تصویر دانلود شد.", "info");
+    downloadInvoiceImage(fileName);
+  }
+}
+
+function downloadInvoiceImage(fileName) {
+  if (!currentInvoiceBlob) return;
+  const url = URL.createObjectURL(currentInvoiceBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName || `invoice-${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ============================================================
+   نوتیفیکیشن
+   ============================================================ */
 function scheduleDeadlineTimer(taskId, deadline, title) {
-  // اگه تایمر قبلی هست، کنسل کن
   cancelNotifTimer(taskId);
-
   const now = Date.now();
   const deadlineMs = deadline.getTime();
   const diff = deadlineMs - now;
 
   if (diff <= 0) {
-    // موعدش گذشته — همین الان نوتیف بده
     sendDeadlineNotification(taskId, title, true);
-    // 👈 و هر ۲۴ ساعت تکرار کن
     startRepeatTimer(taskId, title);
     return;
   }
 
-  // نوتیف اول — سر موعد
   const timer = setTimeout(() => {
     sendDeadlineNotification(taskId, title, false);
-    // 👈 بعدش هر ۲۴ ساعت تکرار کن تا تیک بخوره
     startRepeatTimer(taskId, title);
   }, diff);
 
   notifTimers.set(taskId, timer);
-  console.log(`⏰ Timer set for task ${taskId} in ${Math.floor(diff / 60000)} minutes`);
 }
 
-/* ---------- تایمر تکرار هر ۲۴ ساعت ---------- */
 function startRepeatTimer(taskId, title) {
-  // اگه تایمر تکرار قبلی هست، پاکش کن
   const existingKey = "repeat-" + taskId;
-  if (notifTimers.has(existingKey)) {
-    clearInterval(notifTimers.get(existingKey));
-  }
+  if (notifTimers.has(existingKey)) clearInterval(notifTimers.get(existingKey));
 
-  // هر ۲۴ ساعت نوتیف بده (فقط اگه هنوز انجام نشده)
   const repeatTimer = setInterval(async () => {
-    // چک کن تسک هنوز انجام نشده
     const task = await getTaskById(taskId);
     if (!task || task.completed) {
       cancelNotifTimer(taskId);
       return;
     }
-
     sendDeadlineNotification(taskId, title, true);
-    console.log(`🔔 Repeat notification for task ${taskId}`);
-  }, 24 * 60 * 60 * 1000); // ۲۴ ساعت
+  }, 24 * 60 * 60 * 1000);
 
   notifTimers.set(existingKey, repeatTimer);
 }
 
-/* ---------- کنسل کردن تایمرها ---------- */
 function cancelNotifTimer(taskId) {
   if (notifTimers.has(taskId)) {
     clearTimeout(notifTimers.get(taskId));
@@ -886,25 +1206,10 @@ function cancelNotifTimer(taskId) {
   }
 }
 
-/* ---------- گرفتن تسک با ID ---------- */
-function getTaskById(id) {
-  return new Promise((resolve) => {
-    if (!db) return resolve(null);
-    try {
-      const tx = db.transaction(["To do"], "readonly");
-      const req = tx.objectStore("To do").get(id);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
-    } catch (e) { resolve(null); }
-  });
-}
-
-/* ---------- ارسال نوتیفیکیشن ددلاین ---------- */
 async function sendDeadlineNotification(taskId, title, isOverdue) {
   const notifTitle = isOverdue ? "🔴 موعد تسک رسید!" : "⏰ یادآوری تسک";
   const notifBody = `"${title}" هنوز انجام نشده`;
 
-  // ۱. از طریق Service Worker (بهترین حالت — روی موبایل هم کار می‌کنه)
   if (swRegistration && "showNotification" in swRegistration) {
     try {
       await swRegistration.showNotification(notifTitle, {
@@ -913,29 +1218,24 @@ async function sendDeadlineNotification(taskId, title, isOverdue) {
         badge: "./assets/img/maskable-512.png",
         tag: "task-" + taskId,
         renotify: true,
-        requireInteraction: true, // 👈 نوتیف نمی‌ره تا کاربر کلیک کنه
-        vibrate: [300, 100, 300, 100, 300], // 👈 مثل پیامک ویبره بزنه
+        requireInteraction: true,
+        vibrate: [300, 100, 300, 100, 300],
         data: { taskId, url: "./" },
         actions: [
           { action: "done", title: "✅ انجام شد" },
           { action: "snooze", title: "⏰ ۲ ساعت بعد" },
         ],
       });
-      console.log("✅ Notification shown via SW");
     } catch (err) {
-      console.warn("SW notification failed, fallback:", err);
       sendBasicNotification(notifTitle, notifBody, taskId);
     }
   } else {
-    // ۲. فallback — Notification معمولی
     sendBasicNotification(notifTitle, notifBody, taskId);
   }
 
-  // 👈 ثبت زمان آخرین نوتیف
   updateTaskLastNotif(taskId, new Date().toISOString());
 }
 
-/* ---------- نوتیفیکیشن ساده (Fallback) ---------- */
 function sendBasicNotification(title, body, taskId) {
   if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
@@ -948,16 +1248,10 @@ function sendBasicNotification(title, body, taskId) {
       requireInteraction: true,
       vibrate: [300, 100, 300, 100, 300],
     });
-    notif.onclick = () => {
-      window.focus();
-      notif.close();
-    };
-  } catch (e) {
-    console.warn("Notification error:", e);
-  }
+    notif.onclick = () => { window.focus(); notif.close(); };
+  } catch (e) { /* silent */ }
 }
 
-/* ---------- آپدیت lastNotificationAt ---------- */
 function updateTaskLastNotif(taskId, isoString) {
   if (!db) return;
   try {
@@ -970,27 +1264,22 @@ function updateTaskLastNotif(taskId, isoString) {
       data.lastNotificationAt = isoString;
       store.put(data);
     };
-  } catch (e) { console.warn("updateTaskLastNotif error:", e); }
+  } catch (e) { /* silent */ }
 }
 
-/* ---------- چک کردن نوتیف‌های از دست رفته ---------- */
 async function checkMissedNotifications() {
   const tasks = await getAllTasks();
   const now = Date.now();
 
   for (const task of tasks) {
     if (task.completed || !task.deadline) continue;
-
     const deadline = new Date(task.deadline).getTime();
-    if (deadline > now) continue; // هنوز نرسیده
+    if (deadline > now) continue;
 
-    // موعدش گذشته — بذار کاربر ببینه
     const lastNotif = task.lastNotificationAt ? new Date(task.lastNotificationAt).getTime() : 0;
     const hoursSinceLast = (now - lastNotif) / 3600000;
 
-    // اگه ۲۴ ساعت از آخرین نوتیف گذشته یا اصلاً نوتیف نداده
     if (lastNotif === 0 || hoursSinceLast >= 24) {
-      // کمی تأخیر بده که اپ کامل لود بشه
       setTimeout(() => {
         sendDeadlineNotification(task.id, task.Title, true);
       }, 1500);
@@ -998,14 +1287,12 @@ async function checkMissedNotifications() {
   }
 }
 
-/* ---------- زمان‌بندی همه تایمرها در شروع ---------- */
 async function scheduleAllDeadlineTimers() {
   const tasks = await getAllTasks();
   for (const task of tasks) {
     if (task.completed || !task.deadline) continue;
     scheduleDeadlineTimer(task.id, new Date(task.deadline), task.Title);
   }
-  console.log(`✅ ${notifTimers.size} timers scheduled`);
 }
 
 /* ============================================================
@@ -1026,6 +1313,7 @@ function bindEvents() {
     if (e.key === "Escape") {
       closeForm();
       closeDeleteConfirm();
+      closeInvoicePreview();
     }
   });
 
@@ -1040,10 +1328,13 @@ function bindEvents() {
       return;
     }
 
+    const priceValue = parsePrice(taskPriceInput?.value || "");
+
     if (editingTaskId !== null) {
       updateTask(editingTaskId, {
         Title: title,
         Body: titledisinput.value.trim(),
+        Price: priceValue,
         deadline: selectedDeadline,
       }, () => {
         closeForm();
@@ -1056,6 +1347,34 @@ function bindEvents() {
       });
     }
   });
+
+  // 🆕 فرمت زنده قیمت با حفظ کرسر
+  if (taskPriceInput) {
+    taskPriceInput.addEventListener("input", function () {
+      formatPriceInputLive(this);
+    });
+
+    // فقط ارقام قبول کن
+    taskPriceInput.addEventListener("keypress", function (e) {
+      const char = String.fromCharCode(e.which);
+      if (!/[\d۰-۹٠-٩]/.test(char)) {
+        e.preventDefault();
+      }
+    });
+
+    // paste — ارقام فارسی/انگلیسی رو هندل کن
+    taskPriceInput.addEventListener("paste", function (e) {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData).getData("text");
+      const digits = extractDigits(pasted);
+      if (digits) {
+        const num = parseInt(digits, 10);
+        if (!isNaN(num)) {
+          this.value = num.toLocaleString("en-US");
+        }
+      }
+    });
+  }
 
   searchInput?.addEventListener("input", function () {
     searchTasks(this.value);
@@ -1083,7 +1402,12 @@ function bindEvents() {
 
   document.addEventListener("submit", (e) => e.preventDefault());
 
-  // نوتیفیکیشن
+  shareInvoiceBtn?.addEventListener("click", shareInvoice);
+  closePreviewBtn?.addEventListener("click", closeInvoicePreview);
+  invoicePreview?.addEventListener("click", (e) => {
+    if (e.target === invoicePreview) closeInvoicePreview();
+  });
+
   enableNotifBtn?.addEventListener("click", async () => {
     if (!("Notification" in window)) {
       showToast("مرورگر شما از نوتیفیکیشن پشتیبانی نمی‌کند", "warning");
@@ -1094,9 +1418,9 @@ function bindEvents() {
       if (perm === "granted") {
         showToast("نوتیفیکیشن فعال شد ✅", "success");
         enableNotifBtn.classList.add("active");
-        enableNotifBtn.querySelector("i").className = "bi bi-bell-fill";
+        const icon = enableNotifBtn.querySelector("i");
+        if (icon) icon.className = "bi bi-bell-fill";
 
-        // 👈 تست نوتیفیکیشن
         setTimeout(() => {
           if (swRegistration) {
             swRegistration.showNotification("🎉 نوتیفیکیشن فعال شد", {
@@ -1108,16 +1432,12 @@ function bindEvents() {
           }
         }, 1000);
 
-        // 👈 ثبت periodic sync
         if (swRegistration && "periodicSync" in swRegistration) {
           try {
             await swRegistration.periodicSync.register("deadline-check", {
               minInterval: 24 * 60 * 60 * 1000,
             });
-            console.log("✅ Periodic sync registered");
-          } catch (err) {
-            console.warn("Periodic sync failed:", err);
-          }
+          } catch (err) { /* silent */ }
         }
       } else {
         showToast("اجازه نوتیفیکیشن داده نشد", "danger");
@@ -1127,13 +1447,10 @@ function bindEvents() {
     }
   });
 
-  // PDF
   exportPdfBtn?.addEventListener("click", generateInvoicePDF);
 
-  // 👈 وقتی کاربر به اپ برگشت، چک کن نوتیف از دست رفته داشته یا نه
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      console.log("👀 App visible again — checking missed notifications");
       setTimeout(checkMissedNotifications, 1000);
     }
   });
@@ -1162,7 +1479,7 @@ function showToast(message, type = "info") {
 }
 
 /* ============================================================
-   PDF
+   PDF (فاکتور کل)
    ============================================================ */
 let _vazirFontCache = null;
 
@@ -1186,18 +1503,14 @@ async function generateInvoicePDF() {
     showToast("کتابخانه PDF بارگذاری نشده", "danger");
     return;
   }
-
   showToast("در حال ساخت فاکتور...", "info");
-
   try {
     const { jsPDF } = window.jspdf;
     const allTasks = await getAllTasks();
-
     if (!allTasks || allTasks.length === 0) {
       showToast("هیچ یادداشتی برای فاکتور وجود ندارد", "warning");
       return;
     }
-
     allTasks.sort((a, b) => {
       const da = new Date(a.createdAt || 0);
       const dbb = new Date(b.createdAt || 0);
@@ -1213,36 +1526,35 @@ async function generateInvoicePDF() {
       doc.addFont("Vazirmatn-Regular.ttf", "Vazirmatn", "normal");
       doc.setFont("Vazirmatn");
       fontLoaded = true;
-    } catch (err) { console.warn("فونت لود نشد", err); }
+    } catch (err) { /* silent */ }
 
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 15;
     const contentW = pageW - margin * 2;
 
-    doc.setFillColor(37, 99, 235);
+    doc.setFillColor(30, 64, 175);
     doc.rect(0, 0, pageW, 35, "F");
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     if (fontLoaded) doc.setFont("Vazirmatn", "normal");
-    doc.text("فاکتور یادداشت‌ها", pageW - margin, 15, { align: "right" });
-
-    doc.setFontSize(11);
-    doc.text(`تاریخ صدور: ${formatPersianDateTime(new Date())}`, pageW - margin, 25, { align: "right" });
-
-    const invoiceNo = "INV-" + Date.now().toString().slice(-8);
-    doc.text(`شماره: ${invoiceNo}`, margin, 25, { align: "left" });
+    doc.text(STORE_NAME, pageW - margin, 15, { align: "right" });
+    doc.setFontSize(10);
+    doc.text(STORE_TAGLINE, pageW - margin, 23, { align: "right" });
+    doc.setFontSize(9);
+    doc.text(`تاریخ: ${formatPersianDateTime(new Date())}`, pageW - margin, 31, { align: "right" });
 
     let y = 45;
     const total = allTasks.length;
     const doneCount = allTasks.filter((t) => t.completed).length;
     const pendingCount = total - doneCount;
+    const totalPrice = allTasks.reduce((sum, t) => sum + (t.Price || 0), 0);
 
     const cardW = (contentW - 8) / 3;
     const cardH = 20;
     const cards = [
-      { label: "کل یادداشت‌ها", value: total, color: [37, 99, 235] },
+      { label: "کل", value: total, color: [37, 99, 235] },
       { label: "انجام شده", value: doneCount, color: [22, 163, 74] },
       { label: "در انتظار", value: pendingCount, color: [245, 158, 11] },
     ];
@@ -1251,33 +1563,36 @@ async function generateInvoicePDF() {
       const x = pageW - margin - (i + 1) * cardW - i * 4;
       doc.setFillColor(card.color[0], card.color[1], card.color[2]);
       doc.roundedRect(x, y, cardW, cardH, 3, 3, "F");
-
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
-      if (fontLoaded) doc.setFont("Vazirmatn", "normal");
       doc.text(card.label, x + cardW / 2, y + 7, { align: "center" });
-
       doc.setFontSize(14);
       doc.text(String(card.value), x + cardW / 2, y + 16, { align: "center" });
     });
 
-    y += cardH + 10;
+    y += cardH + 6;
+
+    if (totalPrice > 0) {
+      doc.setFillColor(236, 253, 245);
+      doc.roundedRect(margin, y, contentW, 12, 3, 3, "F");
+      doc.setTextColor(5, 150, 105);
+      doc.setFontSize(11);
+      doc.text(`جمع کل مبالغ: ${formatPrice(totalPrice)} تومان`, pageW - margin - 3, y + 8, { align: "right" });
+      y += 16;
+    }
 
     doc.setFillColor(30, 41, 59);
     doc.rect(margin, y, contentW, 9, "F");
-
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
-    if (fontLoaded) doc.setFont("Vazirmatn", "normal");
 
     const colTitleX = pageW - margin - 3;
-    const colDeadlineX = pageW - margin - contentW * 0.55;
-    const colStatusX = pageW - margin - contentW * 0.85;
+    const colPriceX = pageW - margin - contentW * 0.45;
+    const colStatusX = pageW - margin - contentW * 0.75;
 
     doc.text("عنوان", colTitleX, y + 6, { align: "right" });
-    doc.text("ددلاین", colDeadlineX, y + 6, { align: "center" });
+    doc.text("مبلغ", colPriceX, y + 6, { align: "center" });
     doc.text("وضعیت", colStatusX, y + 6, { align: "center" });
-
     y += 9;
 
     const rowH = 8;
@@ -1292,7 +1607,7 @@ async function generateInvoicePDF() {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
         doc.text("عنوان", colTitleX, y + 6, { align: "right" });
-        doc.text("ددلاین", colDeadlineX, y + 6, { align: "center" });
+        doc.text("مبلغ", colPriceX, y + 6, { align: "center" });
         doc.text("وضعیت", colStatusX, y + 6, { align: "center" });
         y += 9;
       }
@@ -1301,39 +1616,24 @@ async function generateInvoicePDF() {
         doc.setFillColor(248, 250, 252);
         doc.rect(margin, y, contentW, rowH, "F");
       }
-
       doc.setDrawColor(226, 232, 240);
       doc.line(margin, y + rowH, pageW - margin, y + rowH);
-
       doc.setTextColor(30, 41, 59);
       doc.setFontSize(8);
 
       let titleTxt = (task.Title || "بدون عنوان").trim();
-      if (titleTxt.length > 30) titleTxt = titleTxt.substring(0, 28) + "…";
+      if (titleTxt.length > 25) titleTxt = titleTxt.substring(0, 23) + "…";
       doc.text(titleTxt, colTitleX, y + 5.5, { align: "right" });
 
-      let deadlineTxt = "—";
-      if (task.deadline) {
-        const d = new Date(task.deadline);
-        deadlineTxt = `${formatPersianDate(d)} ${formatPersianTime(d)}`;
-      }
-      doc.text(deadlineTxt, colDeadlineX, y + 5.5, { align: "center" });
+      const priceTxt = task.Price ? formatPrice(task.Price) : "—";
+      doc.text(priceTxt, colPriceX, y + 5.5, { align: "center" });
 
       if (task.completed) {
         doc.setTextColor(22, 163, 74);
         doc.text("انجام شده", colStatusX, y + 5.5, { align: "center" });
       } else {
-        const status = task.deadline ? getDeadlineStatus(new Date(task.deadline)) : null;
-        if (status === "overdue") {
-          doc.setTextColor(220, 38, 38);
-          doc.text("گذشته", colStatusX, y + 5.5, { align: "center" });
-        } else if (status === "urgent") {
-          doc.setTextColor(245, 158, 11);
-          doc.text("فوری", colStatusX, y + 5.5, { align: "center" });
-        } else {
-          doc.setTextColor(100, 116, 139);
-          doc.text("در انتظار", colStatusX, y + 5.5, { align: "center" });
-        }
+        doc.setTextColor(100, 116, 139);
+        doc.text("در انتظار", colStatusX, y + 5.5, { align: "center" });
       }
 
       y += rowH;
@@ -1345,10 +1645,8 @@ async function generateInvoicePDF() {
       doc.setPage(p);
       doc.setDrawColor(226, 232, 240);
       doc.line(margin, pageH - 15, pageW - margin, pageH - 15);
-
       doc.setTextColor(148, 163, 184);
       doc.setFontSize(8);
-      if (fontLoaded) doc.setFont("Vazirmatn", "normal");
       doc.text("یادداشت‌یار — فاکتور خودکار", margin, pageH - 9, { align: "left" });
       doc.text(`صفحه ${p} از ${totalPages}`, pageW - margin, pageH - 9, { align: "right" });
     }
@@ -1376,12 +1674,11 @@ window.addEventListener("appinstalled", () => {
 });
 
 /* ============================================================
-   Scroll effect روی هدر
+   Scroll
    ============================================================ */
 function initHeaderScroll() {
   const appHeader = document.getElementById("appHeader");
   if (!appHeader) return;
-
   let ticking = false;
   window.addEventListener("scroll", () => {
     if (!ticking) {
@@ -1396,23 +1693,14 @@ function initHeaderScroll() {
 }
 
 /* ============================================================
-   شروع برنامه
+   Init
    ============================================================ */
 function init() {
   console.log("🚀 init() called");
-
-  try { bindEvents(); console.log("✅ Events bound"); }
-  catch (e) { console.error("❌ bindEvents failed:", e); }
-
-  try { registerSW(); console.log("✅ SW registration started"); }
-  catch (e) { console.error("❌ SW registration failed:", e); }
-
-  try { openDatabase(); console.log("✅ openDatabase called"); }
-  catch (e) { console.error("❌ openDatabase failed:", e); hideLoader(); }
-
-  try { initHeaderScroll(); }
-  catch (e) { console.error("❌ header scroll failed:", e); }
-
+  try { bindEvents(); } catch (e) { console.error("bindEvents failed:", e); }
+  try { registerSW(); } catch (e) { console.error("SW failed:", e); }
+  try { openDatabase(); } catch (e) { console.error("openDatabase failed:", e); hideLoader(); }
+  try { initHeaderScroll(); } catch (e) { console.error("header scroll failed:", e); }
   updateCount(0, 0);
   checkEmptyTasks();
 }

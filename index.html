@@ -58,7 +58,7 @@
         </div>
       </div>
 
-      <!-- Stats (کلیک‌پذیر) -->
+      <!-- Stats -->
       <div class="stats-grid">
         <div class="stat-card stat-total active" data-filter="all" role="button" tabindex="0" aria-label="نمایش همه">
           <div class="stat-icon"><i class="bi bi-list-task"></i></div>
@@ -121,6 +121,14 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label" for="taskPrice">قیمت (اختیاری) - تومان</label>
+        <div class="input-with-icon">
+          <i class="bi bi-cash-coin"></i>
+          <input type="text" class="form-control" id="taskPrice" placeholder="مثلاً: 2,500,000" inputmode="numeric" autocomplete="off" dir="ltr" style="text-align: right;">
+        </div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label" for="taskDeadline">تنظیم کردن تاریخ (اختیاری) - شمسی</label>
         <input type="text" class="form-control" id="taskDeadline" placeholder="انتخاب تاریخ و ساعت..." readonly>
       </div>
@@ -153,15 +161,32 @@
       </div>
     </div>
 
+    <!-- 🧾 Invoice Preview Modal -->
+    <div class="invoice-preview-modal dis-hide" id="invoicePreview">
+      <div class="invoice-preview-actions">
+        <button class="btn-share" id="shareInvoiceBtn" type="button">
+          <i class="bi bi-share-fill"></i>
+          <span>اشتراک‌گذاری</span>
+        </button>
+        <button class="btn-close-preview" id="closePreviewBtn" type="button">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div class="invoice-preview-scroll">
+        <div id="invoiceRenderArea"></div>
+      </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast-container"></div>
 
     <!-- Scripts -->
-       <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <script src="assets/js/app.js"></script>
   </body>
 </html>

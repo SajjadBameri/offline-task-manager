@@ -2,7 +2,7 @@
    Service Worker — یادداشت‌یار
    ============================================================ */
 
-const CACHE_NAME = "yaddashyar-v1";
+const CACHE_NAME = "yaddashyar-v3";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -62,7 +62,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 /* ============================================================
-   Push Notification (وقتی از سرور پیام میاد)
+   Push Notification
    ============================================================ */
 self.addEventListener("push", (event) => {
   console.log("📬 SW: Push received");
@@ -80,8 +80,8 @@ self.addEventListener("push", (event) => {
     badge: "./assets/img/maskable-512.png",
     tag: data.tag || "yaddashyar-" + Date.now(),
     renotify: true,
-    requireInteraction: true, // 👈 نوتیف نمی‌ره تا کاربر کلیک کنه
-    vibrate: [200, 100, 200, 100, 200], // 👈 ویبره مثل پیامک
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 200],
     data: {
       url: data.url || "./",
       taskId: data.taskId || null,
@@ -106,15 +106,12 @@ self.addEventListener("notificationclick", (event) => {
   const notifData = event.notification.data || {};
   const taskId = notifData.taskId;
 
-  // اگر کاربر روی "انجام شد" زد
   if (event.action === "done" && taskId) {
     event.waitUntil(
       self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-        // به همه کلاینت‌های باز پیام بفرست
         clients.forEach((client) => {
           client.postMessage({ type: "MARK_DONE", taskId });
         });
-        // اگه کلاینتی باز نیست، یه پنجره جدید باز کن
         if (clients.length === 0) {
           return self.clients.openWindow("./?action=done&taskId=" + taskId);
         }
@@ -123,7 +120,6 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  // اسنوز (۲ ساعت بعد)
   if (event.action === "snooze" && taskId) {
     event.waitUntil(scheduleLocalNotification(
       "⏰ یادآوری مجدد",
@@ -134,7 +130,6 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  // باز کردن اپ
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
@@ -145,15 +140,12 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-/* ============================================================
-   بستن نوتیفیکیشن
-   ============================================================ */
 self.addEventListener("notificationclose", (event) => {
   console.log("❌ SW: Notification closed");
 });
 
 /* ============================================================
-   Periodic Background Sync (فقط Chrome/Edge اندروید با PWA نصب‌شده)
+   Periodic Background Sync
    ============================================================ */
 self.addEventListener("periodicsync", (event) => {
   console.log("🔄 SW: Periodic sync fired:", event.tag);
@@ -162,10 +154,8 @@ self.addEventListener("periodicsync", (event) => {
   }
 });
 
-/* ---------- چک کردن ددلاین‌ها از داخل SW ---------- */
 async function checkDeadlinesFromSW() {
   try {
-    // دیتابیس IndexedDB رو از داخل SW باز کن
     const db = await openDBFromSW();
     if (!db) return;
 
@@ -177,12 +167,10 @@ async function checkDeadlinesFromSW() {
       const deadline = new Date(task.deadline).getTime();
       const diff = deadline - now;
 
-      // اگه موعدش رسیده یا گذشته و هنوز نوتیف ندادیم
       if (diff <= 0) {
         const lastNotif = task.lastNotificationAt ? new Date(task.lastNotificationAt).getTime() : 0;
         const hoursSinceLastNotif = (now - lastNotif) / 3600000;
 
-        // اگه ۲۴ ساعت از آخرین نوتیف گذشته یا اصلاً نوتیف نداده
         if (hoursSinceLastNotif >= 24 || lastNotif === 0) {
           await self.registration.showNotification("🔴 موعد تسک رسید!", {
             body: `"${task.Title}" هنوز انجام نشده`,
@@ -199,7 +187,6 @@ async function checkDeadlinesFromSW() {
             ],
           });
 
-          // ثبت زمان آخرین نوتیف
           await updateTaskLastNotifFromSW(db, task.id, new Date().toISOString());
         }
       }
@@ -209,11 +196,10 @@ async function checkDeadlinesFromSW() {
   }
 }
 
-/* ---------- توابع کمکی IndexedDB در SW ---------- */
 function openDBFromSW() {
   return new Promise((resolve) => {
     try {
-      const req = indexedDB.open("To do", 4);
+      const req = indexedDB.open("To do", 6);
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
     } catch (e) { resolve(null); }
@@ -249,10 +235,8 @@ function updateTaskLastNotifFromSW(db, id, isoString) {
   });
 }
 
-/* ---------- زمان‌بندی نوتیف از داخل SW ---------- */
 function scheduleLocalNotification(title, body, taskId, delayMs) {
   return new Promise((resolve) => {
-    // setTimeout در SW کار می‌کنه تا وقتی SW زنده باشه
     setTimeout(() => {
       self.registration.showNotification(title, {
         body,
